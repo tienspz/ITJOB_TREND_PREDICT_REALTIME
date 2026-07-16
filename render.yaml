@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: it-job-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: CORS_ORIGINS
+        value: https://it-job-ai.netlify.app,https://it-job-market-intelligence.netlify.app
+      - key: FLASK_ENV
+        value: production

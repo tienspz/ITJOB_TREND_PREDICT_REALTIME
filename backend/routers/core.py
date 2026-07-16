@@ -10,6 +10,30 @@ from backend import model_registry
 
 bp = Blueprint("core", __name__)
 
+# Dataset-level stats used by the static dashboard (previously rendered
+# server-side with Jinja2). Computed once from the processed CSV and cached.
+_dataset_stats_cache = None
+
+
+def _dataset_stats():
+    global _dataset_stats_cache
+    if _dataset_stats_cache is None:
+        stats = {}
+        if os.path.exists(config.PROCESSED_DATA_FILE):
+            try:
+                import pandas as pd
+                skill_cols = ["skill_programming", "skill_cloud", "skill_ai_ml", "skill_database"]
+                df = pd.read_csv(config.PROCESSED_DATA_FILE, usecols=["it_domain"] + skill_cols)
+                stats = {
+                    "data_rows": int(len(df)),
+                    "top_domain": str(df["it_domain"].value_counts().index[0]),
+                    "top_skill": df[skill_cols].sum().idxmax().replace("skill_", "").replace("_", " ").title(),
+                }
+            except Exception:
+                stats = {}
+        _dataset_stats_cache = stats
+    return _dataset_stats_cache
+
 
 @bp.route("/api/health", methods=["GET"])
 def health_check():
@@ -21,7 +45,9 @@ def health_check():
 
 @bp.route("/api/meta", methods=["GET"])
 def get_metadata():
-    return jsonify(model_registry.all_meta())
+    meta = model_registry.all_meta()
+    meta["salary_meta"] = {**(meta.get("salary_meta") or {}), **_dataset_stats()}
+    return jsonify(meta)
 
 
 @bp.route("/api/charts", methods=["GET"])

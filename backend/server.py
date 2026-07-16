@@ -22,7 +22,7 @@ import os
 import sys
 import numpy as np
 import pandas as pd
-from flask import Flask, request, jsonify, send_from_directory, render_template
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from waitress import serve
 
@@ -57,8 +57,11 @@ def create_app():
         static_folder=os.path.join(config.FRONTEND_DIR, "static"),
         template_folder=os.path.join(config.FRONTEND_DIR, "templates"),
     )
-    frontend_origins = os.environ.get("FRONTEND_ORIGINS", "http://localhost:5000,http://127.0.0.1:5000").split(",")
-    CORS(app, resources={r"/api/*": {"origins": frontend_origins}}, supports_credentials=True)
+    frontend_origins = os.environ.get("CORS_ORIGINS", "http://localhost:5000,http://127.0.0.1:5000").split(",")
+    CORS(app, resources={
+        r"/api/*": {"origins": frontend_origins},
+        r"/reports/*": {"origins": frontend_origins},
+    }, supports_credentials=True)
     app.config['UPLOAD_FOLDER'] = config.UPLOAD_FOLDER
     app.config['MAX_CONTENT_LENGTH'] = config.MAX_UPLOAD_BYTES
 
@@ -78,25 +81,16 @@ def _register_legacy_routes(app):
 
     @app.route('/')
     def index():
-        salary_meta = model_registry.get_salary_meta()
-        demand_meta = model_registry.get_demand_meta()
-        cluster_meta = model_registry.get_cluster_meta()
-        # Compute live stat overrides
-        data_file = config.PROCESSED_DATA_FILE
-        ds_size = 0
-        top_domain = "—"
-        top_skill = "—"
-        if os.path.exists(data_file):
-            import pandas as pd
-            try:
-                df_v = pd.read_csv(data_file, usecols=["it_domain", "skill_programming", "skill_cloud", "skill_ai_ml", "skill_database"])
-                ds_size = len(df_v)
-                top_domain = df_v["it_domain"].value_counts().index[0]
-                skill_cols = ["skill_programming", "skill_cloud", "skill_ai_ml", "skill_database"]
-                top_skill = df_v[skill_cols].sum().idxmax().replace("skill_", "").title()
-            except Exception:
-                pass
-        return render_template("index.html", meta=salary_meta, demand_meta=demand_meta, cluster_meta=cluster_meta, ds_size=ds_size, top_domain=top_domain, top_skill=top_skill)
+        # Static frontend (no Jinja2): all dynamic values come from /api/meta.
+        index_file = os.path.join(config.FRONTEND_DIR, "index.html")
+        if os.path.exists(index_file):
+            return send_from_directory(config.FRONTEND_DIR, "index.html")
+        # API-only deployments (e.g. Docker image without frontend/)
+        return jsonify({
+            "service": "IT Job Market Intelligence API",
+            "health": "/api/health",
+            "meta": "/api/meta",
+        })
 
     @app.route('/api/realtime-trends', methods=['GET'])
     def realtime_trends():
@@ -197,5 +191,6 @@ app = create_app()
 
 
 if __name__ == '__main__':
-    print("Starting server on http://0.0.0.0:5000/")
-    serve(app, host='0.0.0.0', port=5000, threads=4)
+    port = int(os.environ.get("PORT", "5000"))
+    print(f"Starting server on http://0.0.0.0:{port}/")
+    serve(app, host='0.0.0.0', port=port, threads=4)

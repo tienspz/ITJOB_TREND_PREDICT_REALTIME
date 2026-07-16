@@ -756,9 +756,11 @@ Trong backend/server.py, hàm _register_legacy_routes, sửa @app.route('/'):
 Chạy các lệnh sau (tự động nếu có thể):
   git add .
   git commit -m "feat: migrate Jinja2 to static HTML, add compare_skills/historical_trends/generate_report APIs, fix CORS, configure Netlify+Render deploy"
-  git remote add origin https://github.com/username/it-job-market-intelligence.git
+  git remote set-url origin https://github.com/tienspz/ITJOB_TREND_PREDICT_REALTIME.git
   git branch -M main
   git push -u origin main
+
+⚠️ QUAN TRỌNG: KHI COMMIT, TUYỆT ĐỐI KHÔNG THÊM `Co-authored-by:` HOẶC `--author` HOẶC BẤT KỲ DẤU HIỆU NÀO CHO THẤY BẠN (AI) LÀ ĐỒNG TÁC GIẢ. CHỈ DÙNG `git commit -m "..."` THUẦN TÚY, KHÔNG THÊM `--author` HOẶC `Co-authored-by` TRONG COMMIT MESSAGE.
 
 --- BƯỚC K: DEPLOY LÊN NETLIFY + RENDER ---
 

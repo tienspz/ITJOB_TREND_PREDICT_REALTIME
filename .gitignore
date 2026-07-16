@@ -31,4 +31,6 @@ Dataset/job_summary.csv
 # Stale processed data (only keep it_jobs_processed.csv)
 data/it_jobs_all.csv
 data/*.bak
-models/best_salary_model.joblib
+
+# Generated JSON reports (created at runtime by /api/generate_report)
+reports/figures/report_*.json

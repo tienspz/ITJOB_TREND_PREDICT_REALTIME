@@ -105,8 +105,9 @@ def extract_skills(text):
                 found_skills.append(kw.strip().title())
                 cat_count += 1
                 features["num_skills"] += 1
-                
-        features[f"skill_{category}"] = cat_count
+
+        # The model was trained with binary 0/1 skill-category flags
+        features[f"skill_{category}"] = 1 if cat_count > 0 else 0
         
     features["skill_diversity"] = sum(1 for k, v in features.items() if k.startswith("skill_") and k != "skill_diversity" and v > 0)
     
@@ -134,17 +135,21 @@ def parse_cv_and_predict(filepath, ext, model=None):
         seniority = "Junior"
         
     # We need defaults for the model since a CV doesn't have a specific job location/type
-    features["seniority_level"] = seniority
+    known_seniority = meta.get("seniority_level", [])
+    features["seniority_level"] = seniority if seniority in known_seniority else (known_seniority[0] if known_seniority else "Mid")
     features["job_type"] = "Remote"
     features["state"] = "CA" if "CA" in meta.get("state", []) else meta["state"][0]
     features["it_domain"] = "Software Engineering" if "Software Engineering" in meta.get("it_domain", []) else meta["it_domain"][0]
-    
+    # Engineered interaction features expected by the trained pipeline
+    features["domain_seniority"] = features["it_domain"] + "_" + features["seniority_level"]
+    features["state_seniority"] = features["state"] + "_" + features["seniority_level"]
+
     df_features = pd.DataFrame([features])
     
     try:
         if model is None:
             model = joblib.load(os.path.join(config.MODELS_DIR, "best_salary_model.joblib"))
-        salary_pred = model.predict(df_features)[0]
+        salary_pred = float(model.predict(df_features)[0])
     except Exception as e:
         logger.error(f"Error predicting salary: {e}")
         salary_pred = 0

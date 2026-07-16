@@ -3,7 +3,7 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
-    const API_BASE = '';
+    const API_BASE = window.API_BASE || '';
     const KNOWN_SKILL_GROUPS = {
         prog: ['Python', 'Java', 'JavaScript', 'C++', 'SQL'],
         cloud: ['AWS', 'Azure', 'Docker', 'Kubernetes', 'CI/CD'],
@@ -59,25 +59,47 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function buildSkillBadges() {
-        Object.entries(KNOWN_SKILL_GROUPS).forEach(([category, skills]) => {
-            const group = document.getElementById(`group-${category}`);
+        const badge = (category, skill) => `<span class="badge rounded-pill skill-badge" data-category="${category}">${skill}</span>`;
+
+        // The salary form has 4 visual groups; each badge keeps the real
+        // model category (prog/cloud/ai/db/devops/framework/dataeng/sec)
+        // that maps onto the hidden pred-* inputs.
+        const groupLayout = {
+            'group-prog': [['prog', ['Python', 'Java', 'JavaScript', 'C++', 'SQL']]],
+            'group-cloud': [['cloud', ['AWS', 'Azure']], ['devops', ['Docker', 'Kubernetes', 'CI/CD']]],
+            'group-data': [['ai', ['Machine Learning', 'PyTorch']], ['db', ['MongoDB', 'PostgreSQL']], ['dataeng', ['Spark']]],
+            'group-other': [['framework', ['React', 'Node.js', 'Spring']], ['sec', ['Cybersecurity']]],
+        };
+        Object.entries(groupLayout).forEach(([groupId, categories]) => {
+            const group = document.getElementById(groupId);
             if (!group) return;
-            group.innerHTML = skills.map(skill => `\n                <span class="badge rounded-pill skill-badge" data-category="${category}">${skill}</span>`).join('');
+            group.innerHTML = categories.map(([cat, skills]) => skills.map(s => badge(cat, s)).join('')).join('');
         });
 
         const clSkills = document.getElementById('cl-skills');
         if (clSkills) {
-            const allSkills = Object.values(KNOWN_SKILL_GROUPS).flat();
-            clSkills.innerHTML = allSkills.map(skill => `\n                <span class="badge rounded-pill skill-badge" data-category="${skill.toLowerCase().replace(/[^a-z0-9]+/g,'-')}">${skill}</span>`).join('');
+            const clusterSkills = [
+                ['prog', ['Python', 'Java', 'SQL']],
+                ['cloud', ['AWS', 'Azure']],
+                ['devops', ['Docker', 'Kubernetes']],
+                ['ai', ['Machine Learning', 'PyTorch']],
+                ['db', ['MongoDB']],
+                ['framework', ['React']],
+                ['sec', ['Cybersecurity']],
+            ];
+            clSkills.innerHTML = clusterSkills.map(([cat, skills]) => skills.map(s => badge(cat, s)).join('')).join('');
         }
     }
 
     function setModelMetaValues(meta) {
         if (!meta) return;
         const salaryMeta = meta.salary_meta || {};
+        // data_rows comes from /api/meta; fall back to train+test split sizes
+        const dataRows = salaryMeta.data_rows
+            || ((salaryMeta.train_size || 0) + (salaryMeta.test_size || 0));
         setText('stat-salary', salaryMeta.mean_salary ? new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(salaryMeta.mean_salary) : '$0');
-        setText('stat-jobs', salaryMeta.data_rows ? salaryMeta.data_rows.toLocaleString() : '—');
-        setText('stat-domain', salaryMeta.top_domain || '—');
+        setText('stat-jobs', dataRows ? dataRows.toLocaleString() : '—');
+        setText('stat-domain', salaryMeta.top_domain || salaryMeta.it_domain?.[0] || '—');
         setText('stat-skill', salaryMeta.top_skill || '—');
 
         if (modelMetrics.r2) {
@@ -94,12 +116,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    const FALLBACK_DOMAINS = ['Software Engineering', 'Data Science', 'DevOps/SRE', 'Cybersecurity', 'QA/Testing'];
+    const FALLBACK_STATES = ['CA', 'TX', 'NY', 'WA', 'FL', 'Remote'];
+
     async function initMeta() {
         const meta = await fetchMeta();
         if (!meta) {
             buildSkillBadges();
+            populateSelect('hist-domain', FALLBACK_DOMAINS, FALLBACK_DOMAINS[0]);
+            populateSelect('hist-state', FALLBACK_STATES, FALLBACK_STATES[0]);
             return;
         }
+        window._meta = meta;
 
         const salaryMeta = meta.salary_meta || {};
         const demandMeta = meta.demand_meta || {};
@@ -120,7 +148,10 @@ document.addEventListener('DOMContentLoaded', () => {
         populateSelect('cl-job-type', clusterMeta.job_type || salaryMeta.job_type || [], clusterMeta.job_type?.[0] || salaryMeta.job_type?.[0]);
         populateSelect('cl-state', clusterMeta.state || salaryMeta.state || [], 'CA');
 
-        setModelMetaValues(salaryMeta);
+        populateSelect('hist-domain', salaryMeta.it_domain || FALLBACK_DOMAINS, salaryMeta.it_domain?.[0] || FALLBACK_DOMAINS[0]);
+        populateSelect('hist-state', salaryMeta.state || FALLBACK_STATES, 'CA');
+
+        setModelMetaValues(meta);
         buildSkillBadges();
     }
 
@@ -143,7 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
             loadingDiv.classList.remove('d-none');
             
             try {
-                const response = await fetch('/api/realtime-trends');
+                const response = await fetch(`${API_BASE}/api/realtime-trends`);
                 const data = await response.json();
                 
                 if (data.status === 'success') {
@@ -258,30 +289,28 @@ document.addEventListener('DOMContentLoaded', () => {
     // Smart Skill Selector Logic
     // -----------------------------------------------------------------------
 
-    const skillBadges = document.querySelectorAll('#salaryForm .skill-badge');
-    
-    // Category mapping counts
+    // Category mapping counts. Badges are (re)built dynamically by
+    // buildSkillBadges(), so use event delegation on the form.
     const categoryCounts = {
         prog: 0, cloud: 0, ai: 0, db: 0, devops: 0, framework: 0, dataeng: 0, sec: 0
     };
-    
-    skillBadges.forEach(badge => {
-        badge.addEventListener('click', function() {
-            this.classList.toggle('active');
-            const category = this.getAttribute('data-category');
-            
-            if (this.classList.contains('active')) {
-                categoryCounts[category]++;
-            } else {
-                categoryCounts[category]--;
-            }
-            
+
+    const salaryFormEl = document.getElementById('salaryForm');
+    if (salaryFormEl) {
+        salaryFormEl.addEventListener('click', (e) => {
+            const badge = e.target.closest('.skill-badge');
+            if (!badge) return;
+            badge.classList.toggle('active');
+            const category = badge.getAttribute('data-category');
+            if (!(category in categoryCounts)) return;
+
+            categoryCounts[category] += badge.classList.contains('active') ? 1 : -1;
             document.getElementById('pred-' + category).value = categoryCounts[category];
-            
-            let totalSkills = Object.values(categoryCounts).reduce((a, b) => a + b, 0);
+
+            const totalSkills = Object.values(categoryCounts).reduce((a, b) => a + b, 0);
             document.getElementById('pred-num-skills').value = totalSkills;
         });
-    });
+    }
 
     // -----------------------------------------------------------------------
     // Salary Predictor
@@ -323,7 +352,7 @@ document.addEventListener('DOMContentLoaded', () => {
             features.skill_soft_skills = 1; // Default
             
             try {
-                const response = await fetch('/api/predict_salary', {
+                const response = await fetch(`${API_BASE}/api/predict_salary`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(features)
@@ -423,7 +452,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
         
         try {
-            const response = await fetch('/api/upload_cv', {
+            const response = await fetch(`${API_BASE}/api/upload_cv`, {
                 method: 'POST',
                 body: formData,
                 signal: controller.signal
@@ -509,7 +538,7 @@ document.addEventListener('DOMContentLoaded', () => {
             };
             
             try {
-                const response = await fetch('/api/predict_demand', {
+                const response = await fetch(`${API_BASE}/api/predict_demand`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(features)
@@ -747,7 +776,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Đang tải...';
 
         try {
-            const resp = await fetch('/api/realtime/report');
+            const resp = await fetch(`${API_BASE}/api/realtime/report`);
             const data = await resp.json();
 
             if (!resp.ok || data.error) { alert(data.error || 'Lỗi tải dữ liệu realtime'); return; }
@@ -786,18 +815,21 @@ document.addEventListener('DOMContentLoaded', () => {
     // -----------------------------------------------------------------------
     // Cluster Skill Selector (separate counter from salary form)
     // -----------------------------------------------------------------------
-    const clSkillBadges = document.querySelectorAll('#clusterForm .skill-badge');
+    // Delegated like the salary form: badges are rebuilt by buildSkillBadges()
     const clCatCounts = { prog: 0, cloud: 0, ai: 0, db: 0, devops: 0, framework: 0, dataeng: 0, sec: 0 };
-
-    clSkillBadges.forEach(badge => {
-        badge.addEventListener('click', function () {
-            this.classList.toggle('active');
-            const cat = this.getAttribute('data-category');
-            clCatCounts[cat] += this.classList.contains('active') ? 1 : -1;
+    const clSkillsContainer = document.getElementById('cl-skills');
+    if (clSkillsContainer) {
+        clSkillsContainer.addEventListener('click', (e) => {
+            const badge = e.target.closest('.skill-badge');
+            if (!badge) return;
+            badge.classList.toggle('active');
+            const cat = badge.getAttribute('data-category');
+            if (!(cat in clCatCounts)) return;
+            clCatCounts[cat] += badge.classList.contains('active') ? 1 : -1;
             const el = document.getElementById('cl-' + cat);
             if (el) el.value = clCatCounts[cat];
         });
-    });
+    }
 
     // -----------------------------------------------------------------------
     // Cluster Classification
@@ -829,7 +861,7 @@ document.addEventListener('DOMContentLoaded', () => {
             features.num_skills = catIds.reduce((sum, id) => sum + (parseInt(document.getElementById(id).value) || 0), 0);
 
             try {
-                const resp = await fetch('/api/cluster', {
+                const resp = await fetch(`${API_BASE}/api/cluster`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(features)
@@ -849,6 +881,143 @@ document.addEventListener('DOMContentLoaded', () => {
                 alert('Không thể kết nối với API phân cụm.');
             } finally {
                 btn.innerHTML = 'Phân loại';
+                btn.disabled = false;
+            }
+        });
+    }
+
+    // -----------------------------------------------------------------------
+    // Skills Comparison
+    // -----------------------------------------------------------------------
+    const skillsForm = document.getElementById('skillsForm');
+    if (skillsForm) {
+        skillsForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('btn-skills');
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Đang phân tích...';
+            btn.disabled = true;
+            const input = document.getElementById('skills-input').value;
+            const skills = input.split(',').map(s => s.trim()).filter(Boolean);
+            try {
+                const resp = await fetch(`${API_BASE}/api/compare_skills`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ skills })
+                });
+                const data = await resp.json();
+                if (resp.ok) {
+                    document.getElementById('skills-market-value').innerText =
+                        new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(data.market_value);
+                    document.getElementById('skills-percentile').innerText = `Top ${100 - data.percentile}%`;
+                    document.getElementById('skills-percentile').className = `badge ${data.percentile > 60 ? 'bg-success' : data.percentile > 30 ? 'bg-warning text-dark' : 'bg-secondary'}`;
+                    document.getElementById('skills-in-demand').innerText = data.in_demand ? 'Đang có nhu cầu cao' : 'Nhu cầu trung bình';
+                    document.getElementById('skills-in-demand').className = `badge ms-1 ${data.in_demand ? 'bg-success' : 'bg-secondary'}`;
+                    document.getElementById('skills-related-roles').innerHTML = data.related_roles.map(r => `<span class="badge bg-info me-1">${r}</span>`).join('') || '<p class="text-muted">—</p>';
+                    document.getElementById('skills-gaps').innerHTML = data.skill_gaps.map(g => `<p class="text-warning small mb-1"><i class="bi bi-lightbulb"></i> ${g}</p>`).join('') || '<p class="text-success small">Không thiếu kỹ năng!</p>';
+                    document.getElementById('skills-result').classList.remove('d-none');
+                    document.getElementById('skills-result').classList.add('animate-fade-in');
+                } else {
+                    alert('Lỗi: ' + (data.error || 'Đã có lỗi'));
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Không thể kết nối API so sánh kỹ năng.');
+            } finally {
+                btn.innerHTML = '<span>Phân Tích Kỹ Năng</span>';
+                btn.disabled = false;
+            }
+        });
+    }
+
+    // -----------------------------------------------------------------------
+    // Historical Trends
+    // -----------------------------------------------------------------------
+    const historyForm = document.getElementById('historyForm');
+    let historyChartInstance = null;
+    if (historyForm) {
+        historyForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('btn-history');
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Đang tải...';
+            btn.disabled = true;
+            try {
+                const resp = await fetch(`${API_BASE}/api/historical_trends`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        domain: document.getElementById('hist-domain').value,
+                        state: document.getElementById('hist-state').value,
+                        months: parseInt(document.getElementById('hist-months').value),
+                    })
+                });
+                const data = await resp.json();
+                if (resp.ok) {
+                    document.getElementById('history-chart-container').classList.remove('d-none');
+                    document.getElementById('history-growth').innerText = `Tốc độ tăng trưởng: ${data.growth_percentage > 0 ? '+' : ''}${data.growth_percentage.toFixed(1)}%/tháng`;
+                    if (historyChartInstance) historyChartInstance.destroy();
+                    const ctx = document.getElementById('historyChart').getContext('2d');
+                    historyChartInstance = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: data.labels,
+                            datasets: [
+                                {
+                                    label: 'Lương trung bình ($)',
+                                    data: data.salary_trend,
+                                    borderColor: '#00d2ff',
+                                    backgroundColor: 'rgba(0,210,255,0.1)',
+                                    yAxisID: 'y',
+                                    tension: 0.3,
+                                    fill: true,
+                                },
+                                {
+                                    label: 'Số lượng việc làm',
+                                    data: data.demand_trend,
+                                    borderColor: '#ffc107',
+                                    backgroundColor: 'rgba(255,193,7,0.1)',
+                                    yAxisID: 'y1',
+                                    tension: 0.3,
+                                    fill: true,
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: { mode: 'index', intersect: false },
+                            plugins: {
+                                legend: { labels: { color: '#e0e0e0' } }
+                            },
+                            scales: {
+                                y: {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'left',
+                                    grid: { color: 'rgba(255,255,255,0.05)' },
+                                    ticks: { color: '#e0e0e0', callback: v => '$' + v.toLocaleString() }
+                                },
+                                y1: {
+                                    type: 'linear',
+                                    display: true,
+                                    position: 'right',
+                                    grid: { drawOnChartArea: false },
+                                    ticks: { color: '#e0e0e0' }
+                                },
+                                x: {
+                                    grid: { color: 'rgba(255,255,255,0.05)' },
+                                    ticks: { color: '#e0e0e0' }
+                                }
+                            }
+                        }
+                    });
+                } else {
+                    alert('Lỗi: ' + (data.error || 'Không có dữ liệu'));
+                }
+            } catch (err) {
+                console.error(err);
+                alert('Không thể tải xu hướng lịch sử.');
+            } finally {
+                btn.innerHTML = '<span>Xem Xu Hướng</span>';
                 btn.disabled = false;
             }
         });
