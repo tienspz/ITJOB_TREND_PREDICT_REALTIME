@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="vi" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trí tuệ Thị trường Việc làm IT</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-glass fixed-top">
+        <div class="container-fluid">
+            <a class="navbar-brand d-flex align-items-center" href="#">
+                <span class="fw-bold font-outfit">TechJob<span class="text-gradient">AI</span></span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto nav-pills" id="mainTab" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="dashboard-tab" data-bs-toggle="pill" data-bs-target="#dashboard" type="button" role="tab">Bảng Điều Khiển</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="salary-tab" data-bs-toggle="pill" data-bs-target="#salary" type="button" role="tab">Dự Đoán Lương</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="cv-tab" data-bs-toggle="pill" data-bs-target="#cv" type="button" role="tab">Phân Tích CV</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="demand-tab" data-bs-toggle="pill" data-bs-target="#demand" type="button" role="tab">Xu Hướng Nhu Cầu</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="clusters-tab" data-bs-toggle="pill" data-bs-target="#clusters" type="button" role="tab">Phân Cụm Công Việc</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="realtime-tab" data-bs-toggle="pill" data-bs-target="#realtime" type="button" role="tab">
+                            <i class="bi bi-broadcast-pin"></i> Real-time
+                        </button>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container-fluid main-container mt-5 pt-4">
+        <div class="tab-content" id="mainTabContent">
+
+            <div class="tab-pane fade show active" id="dashboard" role="tabpanel">
+                <div class="row g-4 mb-4">
+                    <div class="col-12 d-flex justify-content-between align-items-center">
+                        <div>
+                            <h2 class="font-outfit fw-bold mb-1">Tổng Quan Thị Trường</h2>
+                            <p class="text-muted">Dữ liệu IT Job Intelligence kết hợp Kaggle & Realtime APIs</p>
+                        </div>
+                        <button id="btn-fetch-trend" class="btn btn-outline-primary glow-button">
+                            <i class="bi bi-cloud-arrow-down"></i> Lấy xu hướng realtime
+                        </button>
+                    </div>
+                </div>
+
+                <div class="row g-4 mb-4">
+                    <div class="col-md-3">
+                        <div class="card stat-card h-100">
+                            <div class="card-body">
+                                <h6 class="text-muted text-uppercase mb-2">Mức Lương IT Trung Bình</h6>
+                                <h2 class="fw-bold text-gradient" id="stat-salary">$0</h2>
+                                <p class="mb-0 text-success small">Top 10% ngành công nghệ</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card stat-card h-100">
+                            <div class="card-body">
+                                <h6 class="text-muted text-uppercase mb-2">Việc làm đã phân tích</h6>
+                                <h2 class="fw-bold text-primary" id="stat-jobs">0</h2>
+                                <p class="mb-0 text-muted small">Từ bộ dữ liệu IT lớn</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card stat-card h-100">
+                            <div class="card-body">
+                                <h6 class="text-muted text-uppercase mb-2">Lĩnh vực hàng đầu</h6>
+                                <h2 class="fw-bold text-info" id="stat-domain">—</h2>
+                                <p class="mb-0 text-muted small">Theo tập dữ liệu</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card stat-card h-100">
+                            <div class="card-body">
+                                <h6 class="text-muted text-uppercase mb-2">Kỹ năng nổi bật</h6>
+                                <h2 class="fw-bold text-warning" id="stat-skill">—</h2>
+                                <p class="mb-0 text-muted small">Dựa trên dữ liệu đã xử lý</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-4 mb-4">
+                    <div class="col-12">
+                        <div class="card chart-card">
+                            <div class="card-header bg-transparent border-0 pt-3 d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0">Dự Báo Xu Hướng</h5>
+                                <span id="trend-status" class="badge bg-secondary">Nguồn: Offline CSV</span>
+                            </div>
+                            <div class="card-body">
+                                <div id="trend-loading" class="text-center d-none py-5">
+                                    <div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>
+                                    <p class="mt-2 text-muted">Đang tải dữ liệu realtime...</p>
+                                </div>
+                                <canvas id="trendChart" style="max-height: 300px; display: none;"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="salary" role="tabpanel">
+                <div class="row justify-content-center animate-fade-in">
+                    <div class="col-lg-8">
+                        <div class="card glass-card">
+                            <div class="card-body p-5">
+                                <div class="text-center mb-4">
+                                    <h2 class="font-outfit fw-bold">Dự Đoán Lương bằng AI</h2>
+                                    <p class="text-muted">Nhập thông tin công việc để nhận mức lương ước tính.</p>
+                                </div>
+                                <form id="salaryForm">
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label">Lĩnh vực IT</label>
+                                            <select class="form-select" id="pred-domain"></select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Cấp bậc</label>
+                                            <select class="form-select" id="pred-seniority"></select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Hình thức làm việc</label>
+                                            <select class="form-select" id="pred-job-type"></select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Vị trí (Bang)</label>
+                                            <select class="form-select" id="pred-state"></select>
+                                        </div>
+                                        <div class="col-12 mt-4">
+                                            <h6 class="mb-3 text-muted border-bottom border-secondary pb-2">Chọn bộ kỹ năng</h6>
+                                            <div class="skill-groups">
+                                                <div class="mb-3">
+                                                    <span class="small text-secondary d-block mb-2">Lập trình:</span>
+                                                    <div class="d-flex flex-wrap gap-2" id="group-prog"></div>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <span class="small text-secondary d-block mb-2">Cloud & DevOps:</span>
+                                                    <div class="d-flex flex-wrap gap-2" id="group-cloud"></div>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <span class="small text-secondary d-block mb-2">AI & Data:</span>
+                                                    <div class="d-flex flex-wrap gap-2" id="group-data"></div>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <span class="small text-secondary d-block mb-2">Framework & Bảo mật:</span>
+                                                    <div class="d-flex flex-wrap gap-2" id="group-other"></div>
+                                                </div>
+                                            </div>
+                                            <input type="hidden" id="pred-num-skills" value="0">
+                                            <input type="hidden" id="pred-prog" value="0">
+                                            <input type="hidden" id="pred-cloud" value="0">
+                                            <input type="hidden" id="pred-ai" value="0">
+                                            <input type="hidden" id="pred-db" value="0">
+                                            <input type="hidden" id="pred-devops" value="0">
+                                            <input type="hidden" id="pred-framework" value="0">
+                                            <input type="hidden" id="pred-dataeng" value="0">
+                                            <input type="hidden" id="pred-sec" value="0">
+                                        </div>
+                                        <div class="col-12 mt-4 text-center">
+                                            <button type="submit" class="btn btn-primary btn-lg px-5 glow-button" id="btn-predict">Dự Đoán Lương</button>
+                                        </div>
+                                    </div>
+                                </form>
+                                <div id="salary-result" class="mt-5 text-center d-none">
+                                    <h5 class="text-muted mb-2">Lương Hàng Năm Ước Tính</h5>
+                                    <h1 class="display-3 fw-bold text-gradient mb-3" id="salary-value">$0</h1>
+                                    <div class="progress" style="height: 10px;"><div class="progress-bar bg-success" role="progressbar" style="width: 50%" aria-valuenow="50" aria-valuemin="0" aria-valuemax="100"></div></div>
+                                    <div class="d-flex justify-content-between mt-2 text-muted small"><span>$50,000</span><span>$300,000+</span></div>
+                                    <div class="mt-3"><span class="badge bg-info me-2" id="model-r2">R² = -</span><span class="badge bg-warning text-dark" id="model-mae">MAE = $0</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="cv" role="tabpanel">
+                <div class="row justify-content-center animate-fade-in">
+                    <div class="col-lg-8">
+                        <div class="card glass-card">
+                            <div class="card-body p-5 text-center">
+                                <h2 class="font-outfit fw-bold mb-3">Phân Tích CV bằng AI</h2>
+                                <p class="text-muted mb-5">Tải lên CV của bạn (PDF hoặc hình ảnh) để trích xuất kỹ năng và dự đoán lương.</p>
+                                <div class="upload-area mb-4" id="uploadArea">
+                                    <h1 class="display-1 text-primary mb-3"></h1>
+                                    <h5>Kéo & Thả CV của bạn vào đây</h5>
+                                    <p class="text-muted small">hoặc nhấp để chọn tệp (PDF, PNG, JPG)</p>
+                                    <input type="file" id="cvFileInput" accept=".pdf,.png,.jpg,.jpeg" class="d-none">
+                                    <button class="btn btn-outline-primary mt-2" onclick="document.getElementById('cvFileInput').click()">Chọn Tệp</button>
+                                </div>
+                                <div id="cv-loading" class="d-none mt-4 text-center"><div class="spinner-border text-primary mb-3" role="status"><span class="visually-hidden">Đang tải...</span></div><h5 class="text-info">Đang phân tích CV...</h5></div>
+                                <div id="cv-result" class="d-none text-start mt-5 border-top border-secondary pt-4">
+                                    <div class="row g-4">
+                                        <div class="col-md-6">
+                                            <div class="card bg-dark border-secondary h-100"><div class="card-body"><h5 class="card-title text-info mb-3">Hồ sơ trích xuất</h5><p class="mb-1 text-muted small">Cấp bậc suy luận:</p><h4 class="mb-3" id="cv-seniority">—</h4><p class="mb-1 text-muted small">Kỹ năng tìm thấy:</p><div id="cv-skills-badges" class="d-flex flex-wrap gap-1"></div></div></div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="card bg-dark border-secondary h-100"><div class="card-body text-center d-flex flex-column justify-content-center"><h5 class="card-title text-success mb-3">Giá trị thị trường</h5><h1 class="display-4 fw-bold text-gradient mb-0" id="cv-salary">$0</h1><p class="text-muted mt-2">Lương Hàng Năm Dự Đoán</p><div class="mt-2"><span class="badge bg-info me-1" style="font-size:0.7rem" id="cv-r2">R² = -</span><span class="badge bg-warning text-dark" style="font-size:0.7rem" id="cv-mae">MAE = $0</span></div></div></div>
+                                        </div>
+                                    </div>
+                                    <div class="text-center mt-4"><button class="btn btn-outline-primary" onclick="resetCVUpload()">Upload CV khác</button></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="demand" role="tabpanel">
+                <div class="row g-4 animate-fade-in">
+                    <div class="col-lg-12">
+                        <div class="card glass-card">
+                            <div class="card-body">
+                                <h3 class="font-outfit fw-bold mb-4">Mô Hình Dự Báo Nhu Cầu</h3>
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <div class="p-4 bg-dark rounded border border-secondary mb-4">
+                                            <h5 class="text-warning mb-3">Kiểm tra mức độ tuyển dụng</h5>
+                                            <form id="demandForm">
+                                                <div class="mb-3"><label class="form-label small">Lĩnh vực IT</label><select class="form-select form-select-sm" id="dem-domain"></select></div>
+                                                <div class="mb-3"><label class="form-label small">Vị trí (Bang)</label><select class="form-select form-select-sm" id="dem-state"></select></div>
+                                                <div class="mb-3"><label class="form-label small">Cấp bậc</label><select class="form-select form-select-sm" id="dem-seniority"></select></div>
+                                                <div class="mb-3"><label class="form-label small">Hình thức làm việc</label><select class="form-select form-select-sm" id="dem-job-type"></select></div>
+                                                <button type="submit" class="btn btn-warning w-100 btn-sm" id="btn-demand">Tính Điểm Nhu Cầu</button>
+                                            </form>
+                                            <div id="demand-result-box" class="mt-4 text-center d-none"><h1 class="display-4 fw-bold" id="demand-score-val">0</h1><h6 class="text-uppercase tracking-wide" id="demand-interp">Unknown</h6><div class="progress mt-2" style="height: 5px;"><div class="progress-bar bg-warning" id="demand-bar" role="progressbar" style="width: 0%"></div></div></div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-8"><div class="row g-4"><div class="col-12"><div class="card bg-transparent border-secondary"><div class="card-body text-center"><img src="/reports/figures/13_demand_radar.png" class="img-fluid rounded" alt="Demand Radar"></div></div></div><div class="col-12"><div class="card bg-transparent border-secondary"><div class="card-body text-center"><img src="/reports/figures/08_posting_frequency.png" class="img-fluid rounded" alt="Posting Frequency"></div></div></div></div></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="clusters" role="tabpanel">
+                <div class="row g-4 animate-fade-in">
+                    <div class="col-lg-12">
+                        <div class="card glass-card">
+                            <div class="card-body">
+                                <h3 class="font-outfit fw-bold mb-4">Phân Cụm Thị Trường Việc Làm</h3>
+                                <div class="row g-4 mb-4"><div class="col-lg-6 text-center"><h5 class="text-muted mb-3">K tối ưu</h5><img src="/reports/figures/elbow_method.png" class="img-fluid rounded border border-secondary" alt="Elbow Method"></div><div class="col-lg-6 text-center"><h5 class="text-muted mb-3">Trực quan hóa cụm</h5><img src="/reports/figures/cluster_results.png" class="img-fluid rounded border border-secondary" alt="Cluster Results"></div></div>
+                                <div class="row g-4 mt-2"><div class="col-lg-6 mx-auto"><div class="p-4 bg-dark rounded border border-secondary"><h5 class="text-info mb-3">Phân loại công việc của bạn</h5><form id="clusterForm"><div class="mb-3"><label class="form-label small">Lĩnh vực IT</label><select class="form-select form-select-sm" id="cl-domain"></select></div><div class="mb-3"><label class="form-label small">Cấp bậc</label><select class="form-select form-select-sm" id="cl-seniority"></select></div><div class="mb-3"><label class="form-label small">Hình thức làm việc</label><select class="form-select form-select-sm" id="cl-job-type"></select></div><div class="mb-3"><label class="form-label small">Vị trí (Bang)</label><select class="form-select form-select-sm" id="cl-state"></select></div><div class="mb-3"><label class="form-label small">Kỹ năng</label><div class="d-flex flex-wrap gap-1" id="cl-skills"></div><input type="hidden" id="cl-prog" value="0"><input type="hidden" id="cl-cloud" value="0"><input type="hidden" id="cl-ai" value="0"><input type="hidden" id="cl-db" value="0"><input type="hidden" id="cl-devops" value="0"><input type="hidden" id="cl-framework" value="0"><input type="hidden" id="cl-dataeng" value="0"><input type="hidden" id="cl-sec" value="0"></div><button type="submit" class="btn btn-info w-100 btn-sm" id="btn-cluster">Phân loại</button></form><div id="cluster-result-box" class="mt-4 text-center d-none"><h1 class="display-6 fw-bold text-info" id="cluster-id-val">—</h1><p class="text-muted" id="cluster-desc"></p></div></div></div></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tab-pane fade" id="realtime" role="tabpanel">
+                <div class="row g-4 animate-fade-in">
+                    <div class="col-12 d-flex justify-content-between align-items-center"><div><h2 class="font-outfit fw-bold mb-1">Thị trường Real-time</h2><p class="text-muted">Kết hợp historical + realtime để dự báo tuyển dụng.</p></div><div><span id="rt-source-badge" class="badge bg-secondary">Đang tải...</span><button id="btn-fetch-realtime" class="btn btn-outline-primary glow-button ms-2"><i class="bi bi-arrow-clockwise"></i> Làm mới</button></div></div>
+                </div>
+                <div class="row g-4 mb-4"><div class="col-md-3"><div class="card stat-card h-100"><div class="card-body"><h6 class="text-muted text-uppercase mb-2">Việc làm Real-time</h6><h2 class="fw-bold text-primary" id="rt-total-jobs">—</h2><p class="mb-0 text-muted small" id="rt-source-note">-</p></div></div></div><div class="col-md-3"><div class="card stat-card h-100"><div class="card-body"><h6 class="text-muted text-uppercase mb-2">Kỹ năng nóng</h6><h2 class="fw-bold text-info" id="rt-top-skill">—</h2><p class="mb-0 text-muted small" id="rt-top-skill-share">-</p></div></div></div><div class="col-md-3"><div class="card stat-card h-100"><div class="card-body"><h6 class="text-muted text-uppercase mb-2">Địa điểm hàng đầu</h6><h2 class="fw-bold text-warning" id="rt-top-location">—</h2><p class="mb-0 text-muted small" id="rt-top-location-share">-</p></div></div></div><div class="col-md-3"><div class="card stat-card h-100"><div class="card-body"><h6 class="text-muted text-uppercase mb-2">Công ty hàng đầu</h6><h2 class="fw-bold text-success" id="rt-top-company">—</h2><p class="mb-0 text-muted small" id="rt-top-company-share">-</p></div></div></div></div>
+                <div class="row g-4 mb-4"><div class="col-lg-6"><div class="card chart-card"><div class="card-header bg-transparent border-0 pt-3"><h5 class="mb-0">Top kỹ năng (7 ngày)</h5></div><div class="card-body"><canvas id="rtSkillsChart" style="max-height:300px;"></canvas></div></div></div><div class="col-lg-6"><div class="card chart-card"><div class="card-header bg-transparent border-0 pt-3"><h5 class="mb-0">So sánh Historical vs Realtime</h5></div><div class="card-body"><canvas id="rtCompareChart" style="max-height:300px;"></canvas><div class="mt-3 p-2 rounded" style="background:rgba(0,210,255,0.08);border:1px solid rgba(0,210,255,0.2);"><small class="text-info"><i class="bi bi-lightbulb"></i> <span id="rt-conclusion">Đang phân tích...</span></small></div></div></div></div></div>
+                <div class="row g-4 mb-4"><div class="col-lg-8"><div class="card chart-card"><div class="card-header bg-transparent border-0 pt-3"><h5 class="mb-0">Hiring Velocity (7 ngày)</h5></div><div class="card-body"><canvas id="rtVelocityChart" style="max-height:250px;"></canvas></div></div></div><div class="col-lg-4"><div class="card chart-card"><div class="card-header bg-transparent border-0 pt-3"><h5 class="mb-0">Vai trò nổi bật</h5></div><div class="card-body" id="rt-roles-list"><p class="text-muted">-</p></div></div></div></div>
+                <div class="row g-4 mb-4"><div class="col-12"><div class="card chart-card"><div class="card-header bg-transparent border-0 pt-3 d-flex justify-content-between align-items-center"><h5 class="mb-0">Việc làm Real-time gần đây</h5><span id="rt-jobs-count" class="badge bg-primary">0</span></div><div class="card-body"><div class="table-responsive"><table class="table table-dark table-hover mb-0"><thead><tr><th>Vị trí</th><th>Công ty</th><th>Địa điểm</th><th>Kỹ năng</th><th>Kinh nghiệm</th></tr></thead><tbody id="rt-jobs-tbody"><tr><td colspan="5" class="text-center text-muted">Nhấn "Làm mới" để xem dữ liệu</td></tr></tbody></table></div></div></div></div></div>
+            </div>
+
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

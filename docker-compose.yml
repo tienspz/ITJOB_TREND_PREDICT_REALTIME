@@ -1,0 +1,29 @@
+
+services:
+  # 1. Container cho Backend API và Frontend
+  api_server:
+    build: .
+    container_name: it_jobs_api
+    # Trỏ đúng vào thư mục backend chứa server.py
+    command: python -m backend.server
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app # Ánh xạ thư mục máy thật vào container để đồng bộ code/model
+    env_file:
+      - .env
+    restart: unless-stopped # Tự động khởi động lại nếu bị sập
+
+  # 2. Container cho MLOps Worker (weekly retrain)
+  ml_worker:
+    build: .
+    container_name: it_jobs_worker
+    # Chạy file quản lý thời gian
+    command: python auto_worker.py
+    volumes:
+      - .:/app # Chia sẻ chung thư mục /app để đọc được file .pkl và CSV từ api_server
+    env_file:
+      - .env
+    restart: unless-stopped
+    depends_on:
+      - api_server # Đảm bảo server chạy lên trước rồi bot mới bắt đầu làm việc

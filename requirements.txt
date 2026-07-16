@@ -1,0 +1,42 @@
+# Core web app runtime
+Flask>=3.0.0,<4.0.0
+flask-cors>=4.0.0,<5.0.0
+waitress>=3.0.0,<4.0.0
+python-dotenv>=1.0.0,<2.0.0
+requests>=2.31.0,<3.0.0
+
+# Data processing and ML
+pandas>=2.1.0,<3.0.0
+numpy>=1.26.0,<2.0.0
+scikit-learn>=1.3.0,<2.0.0
+joblib>=1.3.0,<2.0.0
+scipy>=1.10.0,<2.0.0
+matplotlib>=3.7.0,<4.0.0
+seaborn>=0.12.0,<1.0.0
+
+# CV parsing
+pdfplumber>=0.10.0,<0.11.0
+
+# Scheduler
+schedule>=1.2.0,<2.0.0
+
+# Improved salary model (XGBoost)
+xgboost>=2.0.0,<3.0.0
+
+# Optional: uncomment for Google Trends support
+# pytrends>=4.9.0,<5.0.0
+
+# Optional: uncomment for OCR-based CV parsing
+# opencv-python-headless>=4.8.0,<5.0.0
+# easyocr>=1.6.0,<2.0.0
+# pdf2image>=1.16.0,<2.0.0
+
+# Optional: uncomment for web scraping
+# beautifulsoup4>=4.13.0,<5.0.0
+# selenium>=4.0.0,<5.0.0
+# webdriver-manager>=4.0.0,<5.0.0
+
+# Jupyter (development only)
+# jupyter>=1.0.0
+# nbconvert>=7.0.0
+# papermill>=2.0.0

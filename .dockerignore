@@ -1,0 +1,26 @@
+.git
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.env
+.dockerignore
+Dockerfile
+docker-compose.yml
+.gitattributes
+.gitignore
+node_modules
+
+# Large dataset files - not needed in image (mounted via volumes)
+Dataset/
+notebooks/
+reports/
+
+# Data & models - mounted via docker-compose volumes, not baked into image
+data/
+models/
+
+# Misc
+*.ipynb
+README.md

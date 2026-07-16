@@ -1,0 +1,556 @@
+Create a professional Vietnamese-language PowerPoint presentation for the project "IT Job Market Intelligence". 
+Style: modern IT dark theme (#0d1117 background, #e6edf3 text, #58a6ff accent blue, #3fb950 accent green).
+Font: Inter or SF Pro for body, JetBrains Mono or Fira Code for numbers/code.
+Use clean minimal layout with icons (biểu tượng), avoid clutter. Each slide: 1 clear point + visual evidence (diagram, table).
+
+IMPORTANT — CANVA AI CANNOT GENERATE IMAGES: You cannot create or insert actual screenshots. Instead, for any slide that mentions a screenshot, CREATE A DARK RECTANGLE PLACEHOLDER with dashed border and text inside: "[Ảnh chụp màn hình — Người dùng chèn sau]". The user will manually paste real screenshots into these placeholders after generation.
+
+Total 12 slides. Content below is EXACT text to use for each slide. Translate ALL Vietnamese text literally.
+
+================================================================================
+SLIDE 1 — Tiêu đề & Mục tiêu
+================================================================================
+Title: "IT Job Market Intelligence"
+Subtitle: "Hệ thống phân tích thị trường việc làm IT bằng Machine Learning"
+
+3 mục tiêu chính (3 columns with icons):
+1. Dự đoán lương IT (Salary Prediction) — RandomForest/XGBoost — R²=0.531
+2. Đánh giá nhu cầu tuyển dụng (Demand Scoring) — RandomForest — R²=0.673
+3. Phân cụm thị trường việc làm (Job Clustering) — PCA+KMeans — Silhouette=0.524
+
+Bottom note: Dữ liệu: Kaggle LinkedIn 1.3M jobs + freehire.dev realtime API
+
+Icon: brain + chart + cluster circles
+
+================================================================================
+SLIDE 2 — Vấn đề chính
+================================================================================
+Title: "Vấn đề — Dữ liệu không hoàn chỉnh, không realtime trực tiếp"
+
+Dòng 1 (vấn đề nguồn):
+  Icon: database with X mark
+  "Không thể lấy dữ liệu trực tiếp từ Google Jobs hay LinkedIn Realtime do giới hạn API và chi phí."
+  → Giải pháp: Kaggle LinkedIn Job Postings dataset (1.3M bài đăng 2024) + API free (freehire.dev, RemoteOK)
+
+Dòng 2 (vấn đề feature):
+  Icon: document with missing pieces
+  "Thiếu các trường quan trọng cho dự đoán lương:"
+  - years_of_experience: không có → phải suy luận từ seniority_level
+  - education_level: không có → bỏ qua
+  - company_size: 60% null → không dùng được
+  - industry: 45% null → không dùng được
+  → Giải pháp: feature engineering từ dữ liệu có sẵn (job_title, job_skills, location)
+
+Dòng 3 (vấn đề dữ liệu thô):
+  Icon: text file with gear
+  "Dữ liệu thô cần giải mã: job_title (text tự do), job_skills (mảng kỹ năng), location (địa điểm), raw_criteria (seniority + employment type dạng text)"
+  → Giải pháp: regex + keyword mapping + bucket encoding
+
+================================================================================
+SLIDE 3 — Feature Engineering & Tiền xử lý
+================================================================================
+Title: "Giải pháp dữ liệu — Feature Engineering từ raw → 17 features"
+
+Sơ đồ flow ngang 3 khối (dùng shapes và arrows):
+
+KHỐI 1: RAW DATA (3 file CSV)
+  linkedin_job_postings.csv | job_skills.csv | job_summary.csv
+  → JOIN bằng job_id → 1.3M rows
+
+KHỐI 2: FEATURE ENGINEERING (biến đổi từng cột)
+  job_title:
+    → it_domain (8 ngành): keyword map — "Software Engineer"→Software Engineering...
+    → seniority_level (4 cấp): regex — /Senior|Lead|Sr/i→Senior, /Junior|Entry|Associate/i→Junior, /Manager|Director/i→Manager, else→Mid
+    Lý do: cột job_level gốc chỉ có 2 giá trị ("Mid-Senior","Associate") — không đủ chi tiết
+
+  job_skills (mỗi skill map vào 1 bucket):
+    → 9 binary features: skill_programming, skill_cloud, skill_ai_ml, skill_database, skill_devops, skill_framework, skill_data_engineering, skill_security, skill_soft_skills
+    → num_skills = tổng số skill
+    → skill_diversity = số bucket khác nhau
+
+  location:
+    → state (50 US state codes): trích "ST" từ "City, ST"
+
+  Tự tạo (Interaction features):
+    → domain_seniority = it_domain + "_" + seniority_level
+    → state_seniority = state + "_" + seniority_level
+
+KHỐI 3: TIỀN XỬ LÝ
+  Lọc IT jobs: giữ 8 domain IT → loại non-IT → 180K rows
+  Xử lý outlier lương (IQR method):
+    Q1=25%, Q3=75%, IQR=Q3-Q1
+    Lower = max(Q1-1.5×IQR, $15K) | Upper = min(Q3+1.5×IQR, $500K)
+    ~50K→~30K rows (loại 40% outlier)
+    Tại sao IQR? Lương phân phối lệch phải, không hình chuông — IQR robust hơn Z-score
+
+KẾT QUẢ: 128,307 IT jobs, 17 features, 30,039 rows có salary (sau IQR)
+
+Icon: funnel diagram 3 tầng thu hẹp dần
+
+================================================================================
+SLIDE 3.5 — Chi tiết Dataset: từng cột gốc và ý nghĩa
+================================================================================
+Title: "3 file CSV gốc — Cột nào là Input, cột nào là Output?"
+
+Visual: 3 bảng nhỏ (1 bảng/file) nối nhau bằng mũi tên JOIN
+
+BẢNG 1 — linkedin_job_postings.csv (1.3M rows, ~25 cột)
+  job_id:          khóa chính, dùng để join
+  job_title:       INPUT — text, dùng để suy ra it_domain + seniority_level
+  salary_annual:   OUTPUT — float (USD), biến mục tiêu của Salary model
+  job_level:       INPUT — text ("Mid-Senior", "Associate"), dùng tham khảo, không dùng trực tiếp
+  job_type:        INPUT — text (Remote/Hybrid/On-site), feature gốc
+  location:        INPUT — text ("City, State"), dùng để suy ra state
+  company_size:    INPUT — float, 60% null → không dùng
+  industry:        INPUT — text, 45% null → không dùng
+  Các cột khác (applies, views, formatted_description...): không dùng trong model
+
+BẢNG 2 — job_skills.csv (1.3M rows)
+  job_id:          khóa ngoại, join với linkedin_job_postings
+  job_skills:      INPUT — text array. VD: ["Python","AWS","Docker","Kubernetes","SQL"]
+                   → dùng để tạo 9 binary skill buckets + num_skills + skill_diversity
+
+BẢNG 3 — job_summary.csv (1.3M rows)
+  job_id:          khóa ngoại, join với linkedin_job_postings
+  raw_criteria:    INPUT — text ("Seniority level\nMid-Senior | Employment type\nFull-time")
+                   → dùng làm fallback cho seniority nếu title không có keyword
+  job_summary:     INPUT — text dài, TIỀM NĂNG (chưa dùng, có thể TF-IDF trong tương lai)
+
+KẾT QUẢ JOIN:
+  1.3M rows gốc → sau join còn ~1.3M (inner join giữ ổn)
+  → Sau lọc IT + drop null → 128,307 rows
+  → 17 features (INPUT) + salary_annual (OUTPUT)
+
+Icon: 3 database icons nối bằng arrows
+
+================================================================================
+SLIDE 4 — Giải pháp Pipeline ML
+================================================================================
+Title: "Pipeline tự động — StandardScaler + OneHotEncoder → 3 Models"
+
+Visual: pipeline flow chart 3 khối nối tiếp
+
+KHỐI 1 — ColumnTransformer (tiền xử lý tự động):
+  10 numeric features → StandardScaler (z = (x-μ)/σ — đưa về cùng scale)
+  7 categorical features → OneHotEncoder (biến chữ thành vector binary — tránh quan hệ thứ tự ảo)
+  Output: ma trận ~120 cột
+
+KHỐI 2 — 3 Model song song:
+
+  Salary (RandomForest/XGBoost):
+    GridSearchCV: 12 tổ hợp tham số (n_estimators, max_depth, min_samples_leaf)
+    RF thắng: max_depth=25, min_samples_leaf=3, n_estimators=400
+    XGBoost thử: n_estimators=500, max_depth=8, learning_rate=0.05, subsample=0.8
+
+  Demand (RandomForest):
+    300 trees, max_depth=15
+    Input: groupby(domain, state, seniority, job_type) → count → log1p → scale 0-100
+
+  Cluster (PCA → KMeans):
+    PCA giảm 120→5 chiều, giữ 79% variance (giải quyết curse of dimensionality)
+    KMeans K=5 (Elbow + Silhouette >0.5)
+
+KHỐI 3 — Output:
+  Salary → predicted_salary (USD)
+  Demand → demand_score (0-100) + interpretation (High/Medium/Low)
+  Cluster → cluster_id (0-4) + description
+
+Icon: pipeline flow chart với 3 nhánh model ở giữa
+
+================================================================================
+SLIDE 4.5 — Chia Train/Test chi tiết
+================================================================================
+Title: "80% học — 20% thi — Số liệu cụ thể từng model"
+
+Visual: 3 progress bars ngang, mỗi bar có 2 màu (xanh=Train, cam=Test), kèm số
+
+MODEL SALARY:
+  Dataset: 30,039 rows (sau IQR outlier removal)
+  Train: 24,031 rows (80%) — model học từ đây
+  Test:  6,008 rows (20%) — model chưa thấy, dùng để tính R² và MAE
+  random_state=42: seed cố định → chia lại y hệt mỗi lần chạy
+  shuffle=True: trộn trước khi chia, tránh bias thứ tự dữ liệu
+
+MODEL DEMAND:
+  Dataset: ~2,300 groups (groupby domain×state×seniority×job_type)
+  Train: ~1,840 groups (80%)
+  Test: ~460 groups (20%)
+
+MODEL CLUSTER:
+  Dataset: 30,039 rows (toàn bộ, không cần test vì unsupervised)
+  Dùng 100% data để học cấu trúc cụm
+
+Tại sao 80/20?
+  Quy tắc Pareto: 80% đủ để RF/XGBoost hội tụ. Với 24K mẫu, thêm dữ liệu không cải thiện đáng kể R².
+  20% (6K mẫu) đủ để đánh giá tin cậy — confidence interval hẹp.
+
+Icon: 3 progress bars 80%-20% với số count cụ thể
+
+================================================================================
+SLIDE 5 — Giải pháp Realtime & Thu thập dữ liệu
+================================================================================
+Title: "Dữ liệu realtime — Provider chain 4 lớp + Cache 1h + Filter 3 lớp"
+
+Phần 1 — CƠ CHẾ THU THẬP:
+  Worker chạy 5h/lần (tùy chọn) — fetch dữ liệu trước, user click có ngay
+  On-demand: user click → fetch API nếu cache hết hạn
+  Cache TTL = 1 giờ — tránh rate-limit, giảm latency
+
+Phần 2 — PROVIDER CHAIN (4 lớp dự phòng, luôn có kết quả):
+  LỚP 1: freehire.dev (miễn phí, 2.9M jobs Mỹ, không cần key)
+  LỚP 2: RemoteOK (miễn phí, global remote jobs)
+  LỚP 3: Disk cache (data/realtime_cache.json, TTL 1h)
+  LỚP 4: Snapshot (15 job mẫu built-in) — đảm bảo dashboard luôn hoạt động
+
+Phần 3 — IT FILTER 3 LỚP (đảm bảo purity ~95%):
+  LỚP 1 - Loại: title chứa non-IT keywords? ["security officer","data entry","finance"...] (50+ pattern) → REJECT
+  LỚP 2 - Giữ: title chứa IT keywords? ["engineer","developer","scientist"...] (40+ pattern) → ACCEPT
+  LỚP 3 - Fallback: ≥2 tech tags? ["Python","AWS","Docker"...] → ACCEPT, else REJECT
+
+Phần 4 — FORECAST XU HƯỚNG:
+  Historical: backup_trends.csv (30 tháng từ Kaggle + monthly noise ±2.5% + 0.29% growth)
+  Forecast: Polynomial Regression degree 2 — đường cong parabol, không overfit như degree 3+
+  Scale API count: scaled = api_count × (historical_avg / current_api_avg)
+
+Icon: shield (filter) + database (cache) + clock (5h) + chart (forecast)
+
+================================================================================
+SLIDE 6 — Đánh giá kết quả
+================================================================================
+Title: "Kết quả — Độ chính xác của 3 mô hình"
+
+BẢNG KẾT QUẢ (dạng card, không phải bảng kẻ):
+
+CARD 1 — SALARY: R² = 0.531 | MAE = $23,088
+  Mô hình giải thích 53.1% phương sai lương
+  Giải thích tại sao không cao hơn:
+  - Thiếu years_of_experience, education, company_size — 3 yếu tố ảnh hưởng lớn đến lương
+  - Binary skills: "Python=1" không phân biệt "5 năm" vs "mới học"
+  - Mức này tương đương các paper tham khảo (R² 0.45-0.60 trên job posting data)
+
+CARD 2 — DEMAND: R² = 0.673
+  Mô hình giải thích 67.3% phương sai nhu cầu
+  Giảm so với baseline (0.826) do seniority 3→4 levels → nhóm nhiều hơn, mỗi nhóm ít data hơn
+  Đây là trade-off chấp nhận được để có phân tích chi tiết hơn
+
+CARD 3 — CLUSTER: Silhouette = 0.524
+  Các cụm tách biệt tốt (ngưỡng: <0.25 kém, 0.25-0.5 trung bình, 0.5-0.7 tốt, >0.7 rất tốt)
+
+Bottom: "Hạn chế chính đến từ chất lượng dữ liệu đầu vào, không phải thuật toán"
+
+Icon: 3 card vuông xếp ngang, mỗi card có icon + số to + giải thích ngắn
+
+================================================================================
+SLIDE 7 — Ứng dụng WebApp (Frontend) — Giao diện và cách sử dụng
+================================================================================
+Title: "Dashboard — 6 tab chức năng, cách sử dụng từng tab"
+
+Visual: Layout tổng thể dashboard — header (logo + title) + nav pills (6 tabs) + content area.
+TẠO 6 KHUNG PLACEHOLDER (hình chữ nhật viền đứt nét, nền tối, text: "[Ảnh chụp màn hình Tab X — Người dùng chèn sau]"), mỗi khung kèm hướng dẫn sử dụng bên dưới.
+
+TAB 1 — TỔNG QUAN (trang chủ, load tự động khi vào web)
+  Placeholder ảnh: Header với 6 stat cards (hàng ngang: 173,803 jobs, Software Engineering, SQL/Python, $120K,...)
+  Cách sử dụng: Không cần thao tác — số liệu tự động đọc từ file CSV và hiển thị
+  Ý nghĩa: Cho user cái nhìn tổng quan về thị trường IT ngay khi vào trang
+  Nguồn dữ liệu: data/it_jobs_processed.csv (đọc trực tiếp mỗi lần load)
+
+TAB 2 — DỰ ĐOÁN LƯƠNG
+  Placeholder ảnh: Form bên trái + kết quả bên phải
+  Cách sử dụng (step-by-step):
+    Bước 1: Chọn Lĩnh vực IT (dropdown: Software Engineering, Data Science...)
+    Bước 2: Chọn Cấp bậc (dropdown: Junior, Mid, Senior, Manager)
+    Bước 3: Chọn Hình thức làm việc (Remote/Hybrid/On-site)
+    Bước 4: Chọn Bang (dropdown 50 US states)
+    Bước 5: Click vào các skill badges để chọn kỹ năng (Python, AWS, Docker, SQL... — badge chuyển màu khi active)
+    Bước 6: Bấm "Dự Đoán Lương" → kết quả hiển thị số $ có animation count-up
+    Kèm badge: R² = 0.531, MAE = $23,088 (độ chính xác model)
+  API gọi: POST /api/predict_salary
+
+TAB 3 — PHÂN TÍCH CV
+  Placeholder ảnh: Upload area (drag & drop) + kết quả phân tích
+  Cách sử dụng:
+    Bước 1: Kéo thả file PDF/PNG/JPG vào vùng upload (hoặc click để chọn file)
+    Bước 2: Chờ AI xử lý — spinner hiển thị "Đang chạy OCR & NLP..."
+    Bước 3: Kết quả trả về: 
+      - Cấp bậc suy luận (Junior/Mid/Senior/Manager)
+      - Danh sách kỹ năng phát hiện (dạng badges)
+      - Mức lương dự đoán ($)
+      - Badge R² = 0.531
+  Công nghệ: pdfplumber (PDF text extraction) + regex skill detection + salary model
+  API gọi: POST /api/upload_cv
+
+TAB 4 — XU HƯỚNG NHU CẦU
+  Placeholder ảnh: Form 4 dropdown + progress bar kết quả
+  Cách sử dụng:
+    Bước 1: Chọn Lĩnh vực IT
+    Bước 2: Chọn Bang
+    Bước 3: Chọn Cấp bậc
+    Bước 4: Bấm "Kiểm tra" → progress bar + score 0-100 + interpretation (Low/Medium/High)
+  Ý nghĩa: VD: "Software Engineering ở California, Senior → score 85/100 = High demand"
+  API gọi: POST /api/predict_demand
+
+TAB 5 — PHÂN CỤM CÔNG VIỆC
+  Placeholder ảnh: 2 biểu đồ EDA (Elbow + Cluster visualization) + form phân loại
+  Cách sử dụng:
+    Phần 1 — Xem biểu đồ: Elbow method (chọn K=5) + Cluster results (PCA scatter 5 màu)
+    Phần 2 — Phân loại job của bạn:
+      Bước 1: Chọn Lĩnh vực IT, Cấp bậc, Hình thức, Bang
+      Bước 2: Click chọn skill badges (giống tab dự đoán lương)
+      Bước 3: Bấm "Phân loại" → kết quả: "Cụm 3 — Software Engineering / Senior / $165K"
+  Ý nghĩa: Biết job của bạn thuộc phân khúc nào trên thị trường
+  API gọi: POST /api/cluster
+
+TAB 6 — THỊ TRƯỜNG REAL-TIME
+  Placeholder ảnh: 4 charts (top skills bar, hiring velocity line, comparison bar, trend line)
+  Cách sử dụng:
+    Bước 1: Bấm "Lấy xu hướng thị trường Real-time" (hoặc chuyển tab → tự động load)
+    Bước 2: Dashboard hiển thị:
+      - Stat cards: total jobs, source (freehire.dev), thời gian cache
+      - Biểu đồ Top Skills (24h/7d): bar chart màu xanh
+      - Biểu đồ Hiring Velocity: line chart 7 ngày
+      - Biểu đồ So sánh kỹ năng Historical vs Realtime: bar chart 2 màu + auto conclusion text
+      - Danh sách Emerging Roles
+      - Bảng Recent Jobs (title + company + location + skills)
+    Bước 3: Bấm "Làm mới dữ liệu" để fetch lại (cache 1h)
+  Biểu đồ Trend:
+    Bước 1: Bấm "Dự báo xu hướng" → đường xanh (30 tháng lịch sử) + đường vàng đứt đoạn (forecast 2 tháng)
+  API gọi: GET /api/realtime/report + GET /api/realtime-trends
+
+Công nghệ: Bootstrap 5 dark glassmorphism + Chart.js (4 charts tương tác) + Jinja2 templates
+
+Icon: 6 tab icons (home, dollar, upload, chart, cluster, live)
+
+================================================================================
+SLIDE 7.5 — Xuất file .joblib để tích hợp WebApp
+================================================================================
+Title: "Export model — 6 file .joblib đóng gói Pipeline hoàn chỉnh"
+
+Visual: 6 file icon xếp lưới 2×3, mỗi file có tên + dung lượng + chức năng
+
+3 MODEL FILES — chứa Pipeline sklearn hoàn chỉnh (ColumnTransformer + Model):
+  best_salary_model.joblib (88 MB)
+    Pipeline: StandardScaler(numeric) + OneHotEncoder(categorical) → RF (max_depth=25, n_estimators=400)
+    Dùng để predict: gọi .predict(features) → predicted_salary
+  demand_model.joblib (5 MB)
+    Pipeline: OneHotEncoder → RF (n_estimators=300)
+    Dùng để predict: gọi .predict(features) → demand_score
+  cluster_model.joblib (0.1 MB)
+    Pipeline: StandardScaler + OneHotEncoder → PCA(5) → KMeans(K=5)
+    Dùng để predict: gọi .predict(features) → cluster_id
+
+3 META FILES — chứa thông tin model + danh sách categories:
+  salary_model_meta.joblib
+    feature_names, r2_score, mae, mean_salary, model_type (RF), it_domain list, seniority_level list, state list, job_type list
+  demand_meta.joblib
+    model_type, r2_score, max_posting_count, it_domain list, state list, seniority_level list, job_type list
+  cluster_meta.joblib
+    n_clusters=5, pca_components=5, silhouette_score, cluster_descriptions, feature_names
+
+CƠ CHẾ TÍCH HỢP VÀO WEBAPP:
+  Bước 1: retrain_all.py chạy → tự động dump 6 file vào thư mục models/
+  Bước 2: Flask startup → model_registry.load_all() gọi joblib.load() từng file
+  Bước 3: Các router (predict.py, core.py) gọi get_salary_model(), get_demand_model(), get_cluster_model()
+  Bước 4: Router nhận request → gọi model.predict(features) → trả JSON
+
+  Lợi ích của Pipeline:
+  - Chỉ cần dump 1 file duy nhất (không cần nhớ preprocessing steps riêng)
+  - Tránh data leakage (preprocessing chỉ fit trên train set)
+  - Deploy dễ: copy file .joblib lên server là chạy
+
+  Tại sao chọn joblib thay vì pickle?
+  - joblib tối ưu cho numpy arrays (RF lưu cấu trúc cây dạng numpy)
+  - Nén tốt hơn, xử lý Pipeline objects chuyên biệt
+  - Tương thích 100% với scikit-learn
+
+Icon: 6 box icons (3 model + 3 meta) + arrow pointing right to server icon
+
+================================================================================
+SLIDE 8 — Backend APIs — Kiến trúc và luồng xử lý
+================================================================================
+Title: "Flask Backend — 8 REST APIs + Kiến trúc Model Registry"
+
+═══════════════════════════════════════════════════════════════════
+PHẦN A — KIẾN TRÚC TỔNG THỂ (sơ đồ)
+═══════════════════════════════════════════════════════════════════
+
+Visual: Flow chart dọc 4 tầng
+
+TẦNG 1 — Flask Server (server.py)
+  ┌──────────────────────────────────────────────┐
+  │  Flask app khởi động → model_registry.load_all() │
+  │  → Gắn 3 Blueprints (core, predict, realtime)   │
+  │  → Render Jinja2 template cho frontend           │
+  └──────────────────┬───────────────────────────┘
+                     │ request từ frontend
+                     ▼
+TẦNG 2 — Routers (3 Blueprints)
+  ┌────────────┬──────────────┬──────────────────┐
+  │ core.py    │ predict.py   │ realtime.py      │
+  │ /api/health│ /predict_*   │ /realtime/*      │
+  │ /api/meta  │ /cluster     │ /realtime-trends │
+  │ /api/charts│ /upload_cv   │                  │
+  └─────┬──────┴──────┬───────┴────────┬─────────┘
+        │             │                │
+        ▼             ▼                ▼
+TẦNG 3 — Services + Models
+  ┌──────────┐  ┌────────────────┐  ┌──────────────────────┐
+  │model_    │  │trend_service   │  │freehire_service      │
+  │registry  │  │remoteok_service│  │realtime_cache        │
+  │(6 joblib)│  │google_jobs_svc │  │cv_parser (OCR+NLP)   │
+  └────┬─────┘  └───────┬────────┘  └──────────┬───────────┘
+       │                │                      │
+       ▼                ▼                      ▼
+TẦNG 4 — Dữ liệu
+  ┌──────────────┐  ┌──────────────────┐  ┌─────────────────┐
+  │models/*.joblib│  │data/realtime_    │  │freehire.dev API │
+  │(6 files)     │  │cache.json (1h)   │  │(external)       │
+  └──────────────┘  └──────────────────┘  └─────────────────┘
+
+═══════════════════════════════════════════════════════════════════
+PHẦN B — DANH SÁCH API CHI TIẾT
+═══════════════════════════════════════════════════════════════════
+
+Code block style (terminal dark background), mỗi endpoint có thêm giải thích:
+
+─── HEALTH + META ────────────────────────────────────────────────
+
+GET /api/health
+  Kiểm tra model đã load thành công chưa
+  Response: {salary: true, demand: true, cluster: true}
+  Dùng để: frontend kiểm tra server sẵn sàng
+
+GET /api/meta
+  Trả về metadata của cả 3 model (R², MAE, danh sách categories)
+  Response: {salary_meta: {r2_score: 0.531, mae: 23088, ..., model_type: "RF"},
+             demand_meta: {r2_score: 0.673, ...},
+             cluster_meta: {silhouette_score: 0.524, cluster_descriptions: {...}}}
+  Dùng để: frontend hiển thị badge độ chính xác + render dropdown options
+
+GET /api/charts
+  Trả về dữ liệu cho biểu đồ EDA (domain_counts, seniority_distribution, top_titles...)
+  Dùng để: trang tổng quan hiển thị stat cards + biểu đồ
+
+─── PREDICTION ───────────────────────────────────────────────────
+
+POST /api/predict_salary
+  Input: {it_domain, seniority_level, job_type, state, 
+          skill_programming, skill_cloud, skill_ai_ml, ... (9 skills),
+          num_skills, skill_diversity}
+  Process: validate input → map vào correct categories → model_registry.salary_model.predict()
+  → Pipeline tự động: StandardScaler + OneHotEncoder → RF predict
+  Output: {predicted_salary: 165230.00, currency: "USD", period: "Annual"}
+  Error handling: 400 nếu input sai format, 503 nếu model chưa load
+
+POST /api/predict_demand
+  Input: {it_domain, state, seniority_level, job_type}
+  Process: validate → model_registry.demand_model.predict()
+  Output: {demand_score: 73, max_score: 100, interpretation: "High"}
+  Interpretation: >75=High, 40-75=Medium, <40=Low
+
+POST /api/cluster
+  Input: {it_domain, seniority_level, job_type, state, skills... (giống predict_salary)}
+  Process: validate → model_registry.cluster_model.predict()
+  → Pipeline: StandardScaler + OneHotEncoder → PCA(5) → KMeans(5)
+  Output: {cluster_id: 3, description: "Cluster 3: Software Engineering / Senior / Avg $165K (8032 jobs)"}
+  Cluster descriptions đọc từ cluster_meta.joblib
+
+─── CV PARSER ────────────────────────────────────────────────────
+
+POST /api/upload_cv
+  Input: file PDF/PNG/JPG (multipart form)
+  Process: 
+    1. Validate file type (pdf, png, jpg, jpeg)
+    2. Lưu file tạm → trích text (pdfplumber cho PDF, easyocr cho ảnh)
+    3. Regex quét kỹ năng từ text → map vào 9 skill buckets
+    4. Suy luận seniority từ title/cấp bậc trong CV
+    5. Gọi salary_model.predict() với features đã trích
+    6. Xóa file tạm
+  Output: {skills: ["Python","SQL","AWS"], seniority: "Senior", 
+           predicted_salary: 165000, currency: "USD"}
+  Error handling: 400 nếu file sai định dạng, 500 nếu OCR lỗi
+
+─── REALTIME ─────────────────────────────────────────────────────
+
+GET /api/realtime/report
+  Process:
+    1. Kiểm tra cache (data/realtime_cache.json, TTL=1h)
+    2. Nếu còn hạn → đọc cache
+    3. Nếu hết hạn → gọi provider chain: freehire.dev → RemoteOK → cache cũ → snapshot
+    4. Mỗi provider có IT filter (3 lớp: exclude → include → tech tags fallback)
+    5. Tính analytics: top_skills, hiring_velocity, comparison, emerging roles
+    6. Lưu cache mới
+  Output: {source: "freehire.dev", total_jobs: 16, top_skills: [{name:"Python",count:12}...],
+           hiring_velocity: {daily_counts: {...}, avg_per_day: 2.3},
+           comparison: {historical_top: [...], realtime_top: [...], conclusion: "..."},
+           jobs: [{title, company, location, skills, date}...],
+           emerging_roles: [...], cached_at: "2026-07-16T01:55:00"}
+
+GET /api/realtime-trends
+  Process:
+    1. Đọc data/backup_trends.csv (30 tháng, Kaggle baseline + noise)
+    2. Gọi trend_service.build_realtime_report() lấy current_job_count
+    3. Scale API count: scaled = api_count × (historical_avg / current_api_avg)
+    4. PolynomialFeatures(degree=2) + LinearRegression → fit 30 tháng
+    5. Predict 2 tháng tiếp theo
+  Output: {status: "success", source: "kaggle+realtime",
+           historical: [{month:"2024-01", job_count:128307}...], (30 items)
+           forecast: [{month:"2026-08", job_count:132450}...]} (2 items)
+
+═══════════════════════════════════════════════════════════════════
+PHẦN C — CƠ CHẾ LOAD MODEL
+═══════════════════════════════════════════════════════════════════
+
+model_registry.py:
+  class Registry:
+      salary_model = None  # Pipeline object
+      demand_model = None
+      cluster_model = None
+      salary_meta = {}
+      demand_meta = {}
+      cluster_meta = {}
+
+  def load_all():
+      # Gọi 1 lần khi Flask startup
+      joblib.load('models/best_salary_model.joblib') → Registry.salary_model
+      joblib.load('models/demand_model.joblib') → Registry.demand_model
+      joblib.load('models/cluster_model.joblib') → Registry.cluster_model
+      # + load 3 meta files
+      # Nếu file không tồn tại → log warning, model=None
+
+  Các router gọi: get_salary_model(), get_demand_model(), get_cluster_model()
+  → KHÔNG cần load model mỗi request → response nhanh (micro giây)
+
+Icon: server rack + database + arrows + code braces
+
+================================================================================
+SLIDE 9 — Kết luận & Hướng phát triển
+================================================================================
+Title: "Tổng kết — Đã làm được gì và sẽ làm gì tiếp theo?"
+
+CỘT TRÁI — ĐÃ LÀM ĐƯỢC:
+  ✓ 3 mô hình ML hoạt động (Salary R²=0.531, Demand R²=0.673, Cluster Silhouette=0.524)
+  ✓ Pipeline tự động từ raw CSV → model → API
+  ✓ Realtime data với provider chain + IT Filter
+  ✓ Dashboard Flask + Chart.js đầy đủ chức năng
+  ✓ Docker deployment
+
+CỘT PHẢI — HƯỚNG PHÁT TRIỂN:
+  → Bổ sung TF-IDF từ job_summary (dự kiến R² salary ~0.65)
+  → Thêm years_of_experience, education, company_size từ API chất lượng cao
+  → Mở rộng realtime provider (Google Jobs, LinkedIn API nếu có budget)
+  → CI/CD + Unit tests
+  → Kubernetes scale
+
+Icon: checkbox list (trái) + arrow + lightbulb (phải)
+
+================================================================================
+DESIGN NOTES FOR CANVA:
+- Dark theme: background #0d1117, cards #161b22, borders #30363d
+- Accent colors: blue #58a6ff (primary), green #3fb950 (success), orange #d29922 (warning)
+- Font: Inter/Noto Sans (body), JetBrains Mono (code/numbers)
+- Icons: use GitHub Octicons or Material Design icons style
+- Each slide: ONE clear takeaway, not more than 7 bullet lines
+- Evidence images: TẠO PLACEHOLDER khung viền đứt có text "[Người dùng chèn ảnh sau]". User tự chụp màn hình từ localhost:5000 và dán vào.
+- Numbers must be LARGE and BOLD (R², MAE, counts)
+- Tables minimal: use cards instead of grid tables for metrics
+================================================================================

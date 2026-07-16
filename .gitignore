@@ -1,0 +1,34 @@
+# Environments
+.env
+.env.local
+.venv
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.bak
+
+# Jupyter
+.ipynb_checkpoints
+
+# Logs
+*.log
+
+# Temp / OS
+.DS_Store
+Thumbs.db
+
+# Raw Kaggle datasets (download separately)
+Dataset/linkedin_job_postings.csv
+Dataset/job_skills.csv
+Dataset/job_summary.csv
+
+# Stale processed data (only keep it_jobs_processed.csv)
+data/it_jobs_all.csv
+data/*.bak
+models/best_salary_model.joblib
