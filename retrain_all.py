@@ -1,7 +1,7 @@
 import os, joblib, warnings
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_score
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
@@ -57,32 +57,31 @@ print(f"  Rows after outlier removal: {len(salary_df)}")
 X = salary_df[features]
 y = salary_df['salary_annual']
 
+# 80/20 split. The 20% test set is ISOLATED: it is never used for training,
+# tuning, or model selection — only for ONE final evaluation of the winner.
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+CV_FOLDS = 3
 
-best_model = None
-best_score = -1
-best_model_name = ""
+# Candidate models are compared by cross-validation ON THE TRAIN SET ONLY.
+candidates = {}  # name -> {'cv_mean', 'cv_std', 'model'}
 
 try:
     from xgboost import XGBRegressor
-    print("  Training XGBoost...")
+    print(f"  Training XGBoost ({CV_FOLDS}-fold CV on train set)...")
     pipe_xgb = Pipeline([
         ('preprocessor', preprocessor),
         ('model', XGBRegressor(n_estimators=500, max_depth=8, learning_rate=0.05,
                                 subsample=0.8, colsample_bytree=0.8,
                                 random_state=42, n_jobs=-1, verbosity=0))
     ])
+    cv_xgb = cross_val_score(pipe_xgb, X_train, y_train, cv=CV_FOLDS, scoring='r2', n_jobs=-1)
     pipe_xgb.fit(X_train, y_train)
-    r2_xgb = r2_score(y_test, pipe_xgb.predict(X_test))
-    mae_xgb = mean_absolute_error(y_test, pipe_xgb.predict(X_test))
-    print(f"  XGBoost R²: {r2_xgb:.4f}, MAE: ${mae_xgb:,.0f}")
-    best_model = pipe_xgb
-    best_score = r2_xgb
-    best_model_name = "XGBoost"
+    candidates['XGBoost'] = {'cv_mean': cv_xgb.mean(), 'cv_std': cv_xgb.std(), 'model': pipe_xgb}
+    print(f"  XGBoost CV R²: {cv_xgb.mean():.4f} ± {cv_xgb.std():.4f}")
 except ImportError:
     print("  XGBoost not installed, skipping.")
 
-print("  Training RandomForest with grid search...")
+print(f"  Training RandomForest (GridSearchCV, {CV_FOLDS}-fold on train set)...")
 pipe_rf = Pipeline([
     ('preprocessor', preprocessor),
     ('model', RandomForestRegressor(random_state=42, n_jobs=-1))
@@ -93,19 +92,28 @@ param_grid = {
     'model__max_depth': [15, 25, None],
     'model__min_samples_leaf': [1, 3],
 }
-gs = GridSearchCV(pipe_rf, param_grid, cv=3, scoring='r2', n_jobs=-1, verbose=0)
+gs = GridSearchCV(pipe_rf, param_grid, cv=CV_FOLDS, scoring='r2', n_jobs=-1, verbose=0)
 gs.fit(X_train, y_train)
-r2_rf = r2_score(y_test, gs.predict(X_test))
-mae_rf = mean_absolute_error(y_test, gs.predict(X_test))
-print(f"  RF tuned R²: {r2_rf:.4f}, MAE: ${mae_rf:,.0f} (params: {gs.best_params_})")
+candidates['RF'] = {
+    'cv_mean': gs.best_score_,
+    'cv_std': float(gs.cv_results_['std_test_score'][gs.best_index_]),
+    'model': gs.best_estimator_,
+}
+print(f"  RF tuned CV R²: {gs.best_score_:.4f} (params: {gs.best_params_})")
 
-if best_score < r2_rf:
-    best_model = gs.best_estimator_
-    best_score = r2_rf
-    best_model_name = "RF"
+# Select the winner by train-set CV score (test set untouched so far)
+best_model_name = max(candidates, key=lambda k: candidates[k]['cv_mean'])
+best = candidates[best_model_name]
+best_model = best['model']
+print(f"  Best by CV: {best_model_name} (CV R²={best['cv_mean']:.4f} ± {best['cv_std']:.4f})")
 
-print(f"  Best model: {best_model_name} (R²={best_score:.4f})")
-joblib.dump(best_model, os.path.join(MODELS_DIR, 'best_salary_model.joblib'))
+# FINAL evaluation — the one and only use of the isolated 20% test set
+y_pred = best_model.predict(X_test)
+r2_test = r2_score(y_test, y_pred)
+mae_test = mean_absolute_error(y_test, y_pred)
+print(f"  FINAL (isolated test 20%): R²={r2_test:.4f}, MAE=${mae_test:,.0f}")
+
+joblib.dump(best_model, os.path.join(MODELS_DIR, 'best_salary_model.joblib'), compress=3)
 
 meta_sal = {
     'feature_names': features,
@@ -113,8 +121,11 @@ meta_sal = {
     'categorical_features': categorical_features,
     'mean_salary': float(y.mean()),
     'median_salary': float(y.median()),
-    'r2_score': float(best_score),
-    'mae': float(mae_xgb if best_model_name == 'XGBoost' else mae_rf),
+    'r2_score': float(r2_test),
+    'mae': float(mae_test),
+    'cv_r2_mean': float(best['cv_mean']),
+    'cv_r2_std': float(best['cv_std']),
+    'cv_folds': CV_FOLDS,
     'train_size': len(X_train),
     'test_size': len(X_test),
     'model_type': best_model_name,
@@ -142,20 +153,26 @@ preprocessor_dem = ColumnTransformer([
     ('cat', OneHotEncoder(handle_unknown='ignore', sparse_output=False), ['it_domain', 'state', 'seniority_level', 'job_type'])
 ])
 
+# Same protocol: 80/20 split, CV on train, one final test evaluation
 X_train, X_test, y_train, y_test = train_test_split(X_dem, y_dem, test_size=0.2, random_state=42)
 
 pipe_dem = Pipeline([
     ('preprocessor', preprocessor_dem),
     ('model', RandomForestRegressor(n_estimators=300, max_depth=15, random_state=42, n_jobs=-1))
 ])
+cv_dem = cross_val_score(pipe_dem, X_train, y_train, cv=5, scoring='r2', n_jobs=-1)
+print(f"  Demand CV R² (5-fold, train): {cv_dem.mean():.4f} ± {cv_dem.std():.4f}")
 pipe_dem.fit(X_train, y_train)
 r2_dem = r2_score(y_test, pipe_dem.predict(X_test))
-print(f"  Demand R²: {r2_dem:.4f}")
+print(f"  Demand FINAL (isolated test 20%): R²={r2_dem:.4f}")
 
-joblib.dump(pipe_dem, os.path.join(MODELS_DIR, 'demand_model.joblib'))
+joblib.dump(pipe_dem, os.path.join(MODELS_DIR, 'demand_model.joblib'), compress=3)
 meta_dem = {
     'model_type': 'RandomForestRegressor (Demand Score 0-100)',
     'r2_score': float(r2_dem),
+    'cv_r2_mean': float(cv_dem.mean()),
+    'cv_r2_std': float(cv_dem.std()),
+    'cv_folds': 5,
     'max_posting_count': int(demand_df['posting_count'].max()),
     'it_domain': sorted(df['it_domain'].dropna().unique().tolist()),
     'seniority_level': sorted(df['seniority_level'].dropna().unique().tolist()),
@@ -198,7 +215,7 @@ for c in range(5):
     avg_sal = subset['salary_annual'].mean()
     cluster_desc[c] = f"Cluster {c}: {top_domain} / {top_sen} / Avg ${avg_sal:,.0f} ({mask.sum()} jobs)"
 
-joblib.dump(pipe_cl, os.path.join(MODELS_DIR, 'cluster_model.joblib'))
+joblib.dump(pipe_cl, os.path.join(MODELS_DIR, 'cluster_model.joblib'), compress=3)
 meta_cl = {
     'n_clusters': 5,
     'pca_components': 5,

@@ -106,8 +106,8 @@ def extract_skills(text):
                 cat_count += 1
                 features["num_skills"] += 1
 
-        # The model was trained with binary 0/1 skill-category flags
-        features[f"skill_{category}"] = 1 if cat_count > 0 else 0
+        # Keyword counts per category — same semantics as the training data
+        features[f"skill_{category}"] = cat_count
         
     features["skill_diversity"] = sum(1 for k, v in features.items() if k.startswith("skill_") and k != "skill_diversity" and v > 0)
     

@@ -75,18 +75,20 @@ DEFAULT_INPUTS = {
     "state": "CA", "it_domain": "Software Engineering",
 }
 
+# skill_* features are keyword COUNTS per category (0..~10 in the training
+# data), not binary flags — keep serving semantics identical to training.
 FEATURE_VALIDATION = {
     "num_skills": {"type": "int", "min": 0, "max": 30},
     "skill_diversity": {"type": "int", "min": 0, "max": 10},
-    "skill_programming": {"type": "int", "min": 0, "max": 1},
-    "skill_cloud": {"type": "int", "min": 0, "max": 1},
-    "skill_ai_ml": {"type": "int", "min": 0, "max": 1},
-    "skill_database": {"type": "int", "min": 0, "max": 1},
-    "skill_devops": {"type": "int", "min": 0, "max": 1},
-    "skill_framework": {"type": "int", "min": 0, "max": 1},
-    "skill_data_engineering": {"type": "int", "min": 0, "max": 1},
-    "skill_security": {"type": "int", "min": 0, "max": 1},
-    "skill_soft_skills": {"type": "int", "min": 0, "max": 1},
+    "skill_programming": {"type": "int", "min": 0, "max": 10},
+    "skill_cloud": {"type": "int", "min": 0, "max": 10},
+    "skill_ai_ml": {"type": "int", "min": 0, "max": 10},
+    "skill_database": {"type": "int", "min": 0, "max": 10},
+    "skill_devops": {"type": "int", "min": 0, "max": 10},
+    "skill_framework": {"type": "int", "min": 0, "max": 10},
+    "skill_data_engineering": {"type": "int", "min": 0, "max": 10},
+    "skill_security": {"type": "int", "min": 0, "max": 10},
+    "skill_soft_skills": {"type": "int", "min": 0, "max": 10},
     "salary_annual": {"type": "float", "min": 0, "max": 1000000},
     "seniority_level": {"type": "category"},
     "job_type": {"type": "category"},
@@ -296,7 +298,7 @@ def compare_skills():
     for skill in skills_input:
         cat = category_map.get(skill.lower())
         if cat:
-            skill_counts[cat] = 1
+            skill_counts[cat] += 1
             categories_found.add(cat)
 
     features = dict(DEFAULT_INPUTS)
@@ -483,7 +485,7 @@ def generate_report():
                 except Exception:
                     pass
         report["sections"]["salary"] = {
-            "model": "RandomForestRegressor",
+            "model": salary_meta.get("model_type", "ML model"),
             "r2_score": salary_meta.get("r2_score"),
             "mae": salary_meta.get("mae"),
             "predictions": salary_data

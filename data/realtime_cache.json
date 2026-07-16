@@ -1,337 +1,236 @@
 {
-  "fetched_at": "2026-07-16T22:25:26",
-  "source": "freehire/api",
+  "fetched_at": "2026-07-16T22:30:41",
+  "source": "remoteok/api",
   "jobs": [
     {
-      "title": "Senior Insights Analyst",
-      "company": "FreedomCare",
+      "title": "Project Manager",
+      "company": "Empire Life",
       "location": "Remote",
-      "state": "US",
+      "state": "Remote",
       "skills": [
-        "Analytics",
-        "Crm",
-        "Data Analytics",
-        "Data Pipelines",
-        "Data Quality",
-        "Data Science",
-        "Google Analytics",
-        "Python"
-      ],
-      "experience": "Senior",
-      "salary": null,
-      "posted_date": "2026-07-16",
-      "source": "freehire/api",
-      "url": "https://freedomcare.com/jobs/7786941003?gh_jid=7786941003"
-    },
-    {
-      "title": "QA Automation Lead",
-      "company": "Trella Health",
-      "location": "Hybrid - Atlanta",
-      "state": "GA",
-      "skills": [
-        "Agile",
-        "AI",
-        "Analytics",
-        "Api",
-        "Appium",
-        "Automation",
-        "Azure",
-        "Azure Devops"
-      ],
-      "experience": "Senior",
-      "salary": null,
-      "posted_date": "2026-07-16",
-      "source": "freehire/api",
-      "url": "https://job-boards.greenhouse.io/trellahealth/jobs/6104649004"
-    },
-    {
-      "title": "Front-End Development Manager",
-      "company": "MSQ DX",
-      "location": "Remote - United States",
-      "state": "US",
-      "skills": [
-        "AI",
-        "Cloud",
-        "Devops",
-        "Nextjs",
         "React",
-        "Spark",
-        "Storybook",
-        "TypeScript"
-      ],
-      "experience": "Manager",
-      "salary": null,
-      "posted_date": "2026-07-16",
-      "source": "freehire/api",
-      "url": "https://job-boards.greenhouse.io/arke/jobs/4284785009"
-    },
-    {
-      "title": "Senior Software Engineer, Machine Learning Inference Platform",
-      "company": "Stack AV",
-      "location": "Pittsburgh, PA or Remote",
-      "state": "PA",
-      "skills": [
-        "AI",
-        "Api",
-        "Cloud",
-        "Cpp",
-        "Cuda",
-        "Deep Learning",
-        "Distributed Systems",
-        "Grpc"
-      ],
-      "experience": "Senior",
-      "salary": null,
-      "posted_date": "2026-07-16",
-      "source": "freehire/api",
-      "url": "https://job-boards.greenhouse.io/stackav/jobs/5164790007"
-    },
-    {
-      "title": "ML Platform Engineer",
-      "company": "Stitch Fix",
-      "location": "Remote, USA",
-      "state": "US",
-      "skills": [
-        "AI",
-        "AWS",
-        "Cloud",
-        "Data Science",
-        "Distributed Systems",
-        "Fastapi",
-        "Feature Engineering",
-        "Generative Ai"
-      ],
-      "experience": "Mid",
-      "salary": null,
-      "posted_date": "2026-07-16",
-      "source": "freehire/api",
-      "url": "https://www.stitchfix.com/careers/jobs?gh_jid=8014448&gh_jid=8014448"
-    },
-    {
-      "title": "VP, Product Management, AI Security & Strategy",
-      "company": "BeyondTrust",
-      "location": "Remote United States",
-      "state": "US",
-      "skills": [
-        "Agentic Ai",
-        "AI",
-        "Autogen",
-        "Cloud",
-        "Cloud Security",
-        "Cybersecurity",
-        "Iam",
-        "LangChain"
-      ],
-      "experience": "Manager",
-      "salary": null,
-      "posted_date": "2026-07-16",
-      "source": "freehire/api",
-      "url": "https://job-boards.greenhouse.io/beyondtrust/jobs/8048873"
-    },
-    {
-      "title": "Director, Data Science/ML",
-      "company": "CookUnity",
-      "location": "United States (Remote)",
-      "state": "US",
-      "skills": [
-        "Ab Testing",
-        "AI",
-        "Airflow",
-        "Analytics",
-        "AWS",
-        "Causal Inference",
-        "Chatgpt",
-        "Cloud"
-      ],
-      "experience": "Manager",
-      "salary": null,
-      "posted_date": "2026-07-16",
-      "source": "freehire/api",
-      "url": "https://careers.cookunity.com/open-roles?gh_jid=7611442003"
-    },
-    {
-      "title": "Senior Data Scientist, Retention & Product",
-      "company": "CookUnity",
-      "location": "United States (Remote)",
-      "state": "US",
-      "skills": [
-        "Ab Testing",
-        "AI",
-        "Chatgpt",
-        "CI/CD",
-        "Containerization",
-        "Crm",
-        "Data Science",
-        "Deep Learning"
-      ],
-      "experience": "Senior",
-      "salary": null,
-      "posted_date": "2026-07-16",
-      "source": "freehire/api",
-      "url": "https://careers.cookunity.com/open-roles?gh_jid=7780185003"
-    },
-    {
-      "title": "Senior Solutions Architect - Appian",
-      "company": "Healthesystems",
-      "location": "Tampa, Florida",
-      "state": "US",
-      "skills": [
-        "Api",
-        "CI/CD",
-        "Design Patterns",
-        "Event Driven Architecture",
-        "Microservices",
-        "Nosql"
-      ],
-      "experience": "Senior",
-      "salary": null,
-      "posted_date": "2026-07-16",
-      "source": "freehire/api",
-      "url": "https://www.healthesystems.com/unassigned/careers-list?gh_jid=7704834003"
-    },
-    {
-      "title": "Staff Site Reliability Engineer",
-      "company": "DAT",
-      "location": "Denver, CO, USA",
-      "state": "CO",
-      "skills": [
-        "Argocd",
-        "Automation",
-        "AWS",
-        "Cloud",
-        "Cpp",
-        "Datadog",
-        "Github",
-        "Github Actions"
-      ],
-      "experience": "Senior",
-      "salary": null,
-      "posted_date": "2026-07-16",
-      "source": "freehire/api",
-      "url": "https://careers.dat.com/jobs/6092034004?gh_jid=6092034004"
-    },
-    {
-      "title": "Site Infrastructure Engineer – Networking & Compute",
-      "company": "Avride",
-      "location": "Austin, Texas",
-      "state": "TX",
-      "skills": [
-        "AI",
-        "Ansible",
-        "Bash",
-        "Cisco",
-        "Infrastructure As Code",
-        "Linux",
-        "Networking",
-        "Python"
-      ],
-      "experience": "Mid",
-      "salary": null,
-      "posted_date": "2026-07-16",
-      "source": "freehire/api",
-      "url": "https://job-boards.greenhouse.io/avride/jobs/4215813009"
-    },
-    {
-      "title": "App Dev Architect (.NET), Contract",
-      "company": "66degrees",
-      "location": "Remote, USA",
-      "state": "US",
-      "skills": [
-        "AI",
-        "Api",
-        "AWS",
-        "Azure",
-        "Cloud",
-        "Cloud Native",
-        "Csharp",
-        "Devops"
-      ],
-      "experience": "Mid",
-      "salary": null,
-      "posted_date": "2026-07-16",
-      "source": "freehire/api",
-      "url": "https://job-boards.greenhouse.io/66degrees/jobs/6117540004"
-    },
-    {
-      "title": "Epicor System Administrator",
-      "company": "Whelen Engineering",
-      "location": "Chester, Connecticut",
-      "state": "US",
-      "skills": [
-        "Api",
-        "Automation",
-        "AWS",
-        "Azure",
-        "Cloud",
-        "Csharp",
-        "Dotnet",
-        "Edi"
-      ],
-      "experience": "Mid",
-      "salary": null,
-      "posted_date": "2026-07-16",
-      "source": "freehire/api",
-      "url": "https://careers.whelen.com/en/postings/c6bf336d-63a4-4e41-a272-3ffb9d04e89f"
-    },
-    {
-      "title": "Senior Frontend Engineer",
-      "company": "Avride",
-      "location": "Austin, Texas",
-      "state": "TX",
-      "skills": [
-        "AI",
-        "Api",
         "Python",
+        "JavaScript"
+      ],
+      "experience": "Manager",
+      "salary": null,
+      "posted_date": "2026-07-15",
+      "source": "remoteok/api",
+      "url": "https://remoteOK.com/remote-jobs/remote-project-manager-empire-life-1134867"
+    },
+    {
+      "title": "Chief Operating Officer",
+      "company": "Verity Search Limited",
+      "location": "London Area, London Area, United Kingdom",
+      "state": "United Kingdom",
+      "skills": [],
+      "experience": "Mid",
+      "salary": null,
+      "posted_date": "2026-07-15",
+      "source": "remoteok/api",
+      "url": "https://remoteOK.com/remote-jobs/remote-chief-operating-officer-verity-search-limited-1134888"
+    },
+    {
+      "title": "Programa de EstÃ¡gio FormaÃ§Ã£o em Vendas SDR Remoto",
+      "company": "Nibo",
+      "location": "Brasil, ",
+      "state": "Remote",
+      "skills": [
         "React",
-        "TypeScript"
-      ],
-      "experience": "Senior",
-      "salary": null,
-      "posted_date": "2026-07-16",
-      "source": "freehire/api",
-      "url": "https://job-boards.greenhouse.io/avride/jobs/4240133009"
-    },
-    {
-      "title": "Civic Data Analyst (Sustainable Mobility)",
-      "company": "trilongroup",
-      "location": "Denver, Colorado",
-      "state": "CO",
-      "skills": [
-        "Analytics",
-        "Api",
-        "Arcgis",
-        "Data Analytics",
-        "Data Science",
-        "Django",
-        "Flask",
-        "Gis"
+        "JavaScript"
       ],
       "experience": "Mid",
       "salary": null,
-      "posted_date": "2026-07-16",
-      "source": "freehire/api",
-      "url": "https://trilongroup.pinpointhq.com/en/postings/71dfe15a-674a-49e8-adff-4e99fe250325"
+      "posted_date": "2026-07-15",
+      "source": "remoteok/api",
+      "url": "https://remoteOK.com/remote-jobs/remote-programa-de-estagio-formacao-em-vendas-sdr-remoto-nibo-1134841"
     },
     {
-      "title": "Civic Data Analyst (Sustainable Mobility)",
-      "company": "trilongroup",
-      "location": "Los Angeles, California",
-      "state": "CA",
+      "title": "Chief Growth Officer",
+      "company": "Original Peptide",
+      "location": "California, California, United States",
+      "state": "United States",
       "skills": [
-        "Analytics",
-        "Api",
-        "Arcgis",
-        "Data Analytics",
-        "Data Science",
-        "Django",
-        "Flask",
-        "Gis"
+        "Go"
       ],
       "experience": "Mid",
       "salary": null,
-      "posted_date": "2026-07-16",
-      "source": "freehire/api",
-      "url": "https://trilongroup.pinpointhq.com/en/postings/91fbc340-7b34-4e53-882b-c1e19d2eb039"
+      "posted_date": "2026-07-14",
+      "source": "remoteok/api",
+      "url": "https://remoteOK.com/remote-jobs/remote-chief-growth-officer-original-peptide-1134878"
+    },
+    {
+      "title": "Chain Account Manager",
+      "company": "CELSIUS",
+      "location": "Ohio, Ohio, United States",
+      "state": "United States",
+      "skills": [
+        "Go",
+        "AI"
+      ],
+      "experience": "Manager",
+      "salary": null,
+      "posted_date": "2026-07-14",
+      "source": "remoteok/api",
+      "url": "https://remoteOK.com/remote-jobs/remote-chain-account-manager-celsius-1134880"
+    },
+    {
+      "title": "Business Development",
+      "company": "Timo",
+      "location": "SÃ£o Paulo e RegiÃ£o",
+      "state": "SÃ£o Paulo e RegiÃ£o",
+      "skills": [
+        "Python"
+      ],
+      "experience": "Mid",
+      "salary": null,
+      "posted_date": "2026-07-14",
+      "source": "remoteok/api",
+      "url": "https://remoteOK.com/remote-jobs/remote-business-development-timo-1134909"
+    },
+    {
+      "title": "Assistant Controller",
+      "company": "Treewalk",
+      "location": "Vancouver, Vancouver, British Columbia, Canada",
+      "state": "Canada",
+      "skills": [
+        "Go"
+      ],
+      "experience": "Mid",
+      "salary": null,
+      "posted_date": "2026-07-14",
+      "source": "remoteok/api",
+      "url": "https://remoteOK.com/remote-jobs/remote-assistant-controller-treewalk-1134904"
+    },
+    {
+      "title": "Designer",
+      "company": "Intelligent Change",
+      "location": "Toronto, Toronto, Ontario, Canada",
+      "state": "Canada",
+      "skills": [
+        "Go"
+      ],
+      "experience": "Mid",
+      "salary": null,
+      "posted_date": "2026-07-14",
+      "source": "remoteok/api",
+      "url": "https://remoteOK.com/remote-jobs/remote-designer-intelligent-change-1134905"
+    },
+    {
+      "title": "Junior Contact Center Agent",
+      "company": "Volkswagen Group",
+      "location": "Palmela, ",
+      "state": "Remote",
+      "skills": [],
+      "experience": "Junior",
+      "salary": null,
+      "posted_date": "2026-07-14",
+      "source": "remoteok/api",
+      "url": "https://remoteOK.com/remote-jobs/remote-junior-contact-center-agent-volkswagen-group-1134886"
+    },
+    {
+      "title": "Freelance grabaciÃ³n de tareas cotidianas para proyecto de IA",
+      "company": "Toloka Annotators",
+      "location": "CÃ³rdoba, CÃ³rdoba, CÃ³rdoba, Argentina",
+      "state": "Argentina",
+      "skills": [
+        "Python"
+      ],
+      "experience": "Mid",
+      "salary": null,
+      "posted_date": "2026-07-14",
+      "source": "remoteok/api",
+      "url": "https://remoteOK.com/remote-jobs/remote-freelance-grabacion-de-tareas-cotidianas-para-proyecto-de-ia-toloka-annotators-1134908"
+    },
+    {
+      "title": "Manager People &amp; Culture",
+      "company": "Bursting Silver",
+      "location": "Toronto, Toronto, Ontario, Canada",
+      "state": "Canada",
+      "skills": [
+        "Go"
+      ],
+      "experience": "Manager",
+      "salary": null,
+      "posted_date": "2026-07-13",
+      "source": "remoteok/api",
+      "url": "https://remoteOK.com/remote-jobs/remote-manager-people-amp-culture-bursting-silver-1134906"
+    },
+    {
+      "title": "Accountant",
+      "company": "City of Greater Sudbury",
+      "location": "Greater Sudbury, ",
+      "state": "Remote",
+      "skills": [],
+      "experience": "Mid",
+      "salary": null,
+      "posted_date": "2026-07-13",
+      "source": "remoteok/api",
+      "url": "https://remoteOK.com/remote-jobs/remote-accountant-city-of-greater-sudbury-1134903"
+    },
+    {
+      "title": "LÃ­der TÃ©cnico de Dados I Remoto",
+      "company": "Bling",
+      "location": "SÃ£o Paulo, SÃ£o Paulo, Brasil",
+      "state": "Brasil",
+      "skills": [
+        "Python"
+      ],
+      "experience": "Mid",
+      "salary": null,
+      "posted_date": "2026-07-13",
+      "source": "remoteok/api",
+      "url": "https://remoteOK.com/remote-jobs/remote-lider-tecnico-de-dados-i-remoto-bling-1134907"
+    },
+    {
+      "title": "Product Manager AI",
+      "company": "YipitData",
+      "location": "US Remote",
+      "state": "US Remote",
+      "skills": [
+        "AI"
+      ],
+      "experience": "Manager",
+      "salary": null,
+      "posted_date": "2026-07-13",
+      "source": "remoteok/api",
+      "url": "https://remoteOK.com/remote-jobs/remote-product-manager-ai-yipitdata-1134770"
+    },
+    {
+      "title": "Data Analyst Excel",
+      "company": "JobsInMass.com",
+      "location": "Boston, ",
+      "state": "Remote",
+      "skills": [],
+      "experience": "Mid",
+      "salary": null,
+      "posted_date": "2026-07-13",
+      "source": "remoteok/api",
+      "url": "https://remoteOK.com/remote-jobs/remote-data-analyst-excel-jobsinmass-com-1134777"
+    },
+    {
+      "title": "Data Analyst Healthcare",
+      "company": "City of Hope",
+      "location": "United States, ",
+      "state": "Remote",
+      "skills": [],
+      "experience": "Mid",
+      "salary": null,
+      "posted_date": "2026-07-13",
+      "source": "remoteok/api",
+      "url": "https://remoteOK.com/remote-jobs/remote-data-analyst-healthcare-city-of-hope-1134759"
+    },
+    {
+      "title": "architect",
+      "company": "Archisearch",
+      "location": "Athens, ",
+      "state": "Remote",
+      "skills": [],
+      "experience": "Mid",
+      "salary": null,
+      "posted_date": "2026-07-12",
+      "source": "remoteok/api",
+      "url": "https://remoteOK.com/remote-jobs/remote-architect-archisearch-1134887"
     }
   ]
 }
