@@ -6,13 +6,13 @@
 # service URL shown in the Render dashboard.
 [[redirects]]
   from = "/api/*"
-  to = "https://it-job-backend.onrender.com/api/:splat"
+  to = "https://itjob-trend-predict-realtime.onrender.com/api/:splat"
   status = 200
   force = true
 
 [[redirects]]
   from = "/reports/*"
-  to = "https://it-job-backend.onrender.com/reports/:splat"
+  to = "https://itjob-trend-predict-realtime.onrender.com/reports/:splat"
   status = 200
   force = true
 
