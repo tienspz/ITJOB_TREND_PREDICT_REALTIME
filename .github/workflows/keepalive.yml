@@ -4,16 +4,15 @@ name: Keep Render backend awake
 # to wake — longer than Netlify's 26s proxy timeout, so a sleeping backend
 # looks like a broken dashboard to the first visitor.
 #
-# This workflow pings the health endpoint every 10 minutes between
-# 06:00–24:00 Vietnam time (UTC+7), keeping the service warm ~18h/day
-# (~558 instance-hours/month, safely under Render's 750h free budget).
+# This workflow pings the health endpoint every 10 minutes AROUND THE CLOCK,
+# keeping the service warm 24/7: at most 744 instance-hours in a 31-day month,
+# which fits Render's 750h/month free budget ONLY IF this is the account's
+# single free web service. Do not add a second free service to this Render
+# account, or both will be suspended mid-month when the shared budget runs out.
 
 on:
   schedule:
-    # 23:00-23:59 UTC = 06:00-06:59 VN
-    - cron: "*/10 23 * * *"
-    # 00:00-16:59 UTC = 07:00-23:59 VN
-    - cron: "*/10 0-16 * * *"
+    - cron: "*/10 * * * *"
   workflow_dispatch: {}
 
 jobs:
