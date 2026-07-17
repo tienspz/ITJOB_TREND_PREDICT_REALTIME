@@ -76,14 +76,17 @@ docker-compose.yml
 └── ml_worker               →  python auto_worker.py (weekly retrain)
 ```
 
-**Dockerfile:** `python:3.10-slim` → installs deps → copies source.
+**Dockerfile:** multi-stage `python:3.12-slim` → installs deps → copies source + models + data.
 
 ## Frontend
 
-Bootstrap 5 dashboard served via Flask Jinja2 templates:
-- `frontend/templates/index.html` — Single-page app
+Static Bootstrap 5 dashboard (no server-side templating — all data via `/api/meta` + fetch):
+- `frontend/index.html` — Single-page app (8 tabs)
 - `frontend/static/js/app.js` — Chart.js + API calls
 - `frontend/static/css/style.css` — Custom styles
+
+Deployed on Netlify (publish dir `frontend`); `/api/*` and `/reports/*` are proxied
+to the Render backend per `netlify.toml`.
 
 ## Data Flow
 
@@ -97,7 +100,10 @@ User clicks "Lấy xu hướng thị trường Real-time"
 
 User clicks "Dự báo xu hướng" (Trend chart)
   → /api/realtime-trends
-  → Read backup_trends.csv (Kaggle-derived, 30 months)
+  → Read backup_trends.csv (BLS-projected baseline, 30 months)
   → Get current API count, scale to match magnitude
-  → Polynomial regression (degree 2) → forecast 2 months
+  → Rolling-origin backtest: Polynomial(deg 2) vs Holt-Winters (MAPE)
+  → Winner forecasts 2 months + 95% confidence interval
+  → history_service also self-accumulates hourly snapshots
+    into data/realtime_history.csv for genuine longitudinal data
 ```

@@ -55,7 +55,6 @@ def create_app():
     app = Flask(
         __name__,
         static_folder=os.path.join(config.FRONTEND_DIR, "static"),
-        template_folder=os.path.join(config.FRONTEND_DIR, "templates"),
     )
     frontend_origins = os.environ.get("CORS_ORIGINS", "http://localhost:5000,http://127.0.0.1:5000").split(",")
     CORS(app, resources={

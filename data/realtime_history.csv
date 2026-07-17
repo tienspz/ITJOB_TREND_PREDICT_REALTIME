@@ -1,3 +1,4 @@
 timestamp,source,total_jobs,top_skill,top_skill_share,domain_counts
 2026-07-17T07:23:34,live,24,AI,11.3,DevOps/SRE:9|Software Engineering:9|Data Science:3|Cybersecurity:2|QA/Testing:1
 2026-07-17T08:00:46,live,24,Cloud,10.6,Software Engineering:14|DevOps/SRE:4|Data Science:3|Cybersecurity:2|QA/Testing:1
+2026-07-17T10:15:11,live,28,AI,12.5,Software Engineering:13|Data Science:10|DevOps/SRE:3|Cybersecurity:2
