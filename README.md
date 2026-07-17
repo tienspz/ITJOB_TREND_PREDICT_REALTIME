@@ -27,6 +27,14 @@ All supervised models follow the standard protocol:
 
 Metrics live in `models/*_meta.joblib` and are served via `/api/meta`.
 
+### Final metrics (isolated 20% test)
+
+| Model | CV on train | Isolated test |
+|-------|-------------|---------------|
+| Salary — tuned RandomForest (`n_estimators=400, max_depth=25, min_samples_leaf=3`) | R² 0.588 ± 0.007 (3-fold) | **R² 0.599 · MAE $21,363** |
+| Demand — RandomForest (300 trees, depth 15) | R² 0.703 ± 0.022 (5-fold) | **R² 0.676** |
+| Cluster — KMeans K=5 + PCA(5) | — (unsupervised) | **silhouette 0.289** |
+
 ## Data Notes (đọc trước khi viết báo cáo)
 
 - The Kaggle LinkedIn dump is a **single-week snapshot** (`first_seen` 2024-01-12..17) —
@@ -119,6 +127,7 @@ docker compose up --build
 ├── requirements.txt
 ├── Dockerfile / docker-compose.yml / render.yaml / netlify.toml
 ├── .env.example
+├── BaoCao_TechJobAI.docx          # Báo cáo đồ án (Word)
 └── LICENSE
 ```
 

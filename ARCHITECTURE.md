@@ -21,7 +21,7 @@ Two-pipeline system: **Historical Analysis** (Kaggle 1.3M LinkedIn dataset) for 
 │  ┌─────────────────┐  │                  │                         │
 │  │ Salary Predictor │  │                  │  1. freehire.dev ───────│
 │  │ (RandomForest)   │  │                  │     (2.9M IT jobs, free)│
-│  │ R²=0.531         │  │                  │  2. RemoteOK ───────────│
+│  │ R²=0.599         │  │                  │  2. RemoteOK ───────────│
 │  ├─────────────────┤  │                  │     (global remote, free)│
 │  │ Demand Scorer    │  │                  │  3. Google Jobs ────────│
 │  │ (RandomForest)   │  │                  │     (needs SERPAPI_KEY) │
@@ -38,14 +38,14 @@ Two-pipeline system: **Historical Analysis** (Kaggle 1.3M LinkedIn dataset) for 
 | Step | Script | Output |
 |------|--------|--------|
 | Raw CSVs | `Dataset/linkedin_job_postings.csv`, `job_skills.csv`, `job_summary.csv` | ~1.3M raw rows |
-| ETL | `Dataset/preprocess_kaggle.py` | 128,307 IT jobs |
-| Processed | `data/it_jobs_processed.csv` | 19 features incl. seniority, skills, domain |
+| ETL | `Dataset/preprocess_kaggle.py` | 128,706 IT jobs |
+| Processed | `data/it_jobs_processed.csv` | 22 columns (18 model features incl. seniority, skills, YoE, domain) |
 | Retrain | `retrain_all.py` | 6 `.joblib` files in `models/` |
 
 **Models trained:**
-- **Salary Predictor** — XGBoost / tuned RandomForest (R²=0.531, MAE=$23,088)
-- **Demand Scorer** — RandomForestRegressor (0–100 hiring intensity)
-- **Job Cluster** — KMeans (K=5, PCA-reduced) for market segmentation
+- **Salary Predictor** — XGBoost / tuned RandomForest (R²=0.599, MAE=$21,363)
+- **Demand Scorer** — RandomForestRegressor (0–100 hiring intensity) — R²=0.676 on isolated test
+- **Job Cluster** — KMeans (K=5, PCA-reduced) for market segmentation — silhouette=0.289
 
 ## Pipeline 2: Real-time
 
