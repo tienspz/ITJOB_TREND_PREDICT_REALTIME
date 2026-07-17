@@ -12,15 +12,18 @@ docker-compose.yml
 .gitignore
 node_modules
 
-# Large dataset files - not needed in image (mounted via volumes)
+# Raw Kaggle dataset (5.8GB) — never needed in the image
 Dataset/
 notebooks/
-reports/
+tests/
+docs/
 
-# Data & models - mounted via docker-compose volumes, not baked into image
-data/
-models/
+# NOTE: data/, models/, reports/ MUST be included — the Render image runs
+# standalone (no volume mounts). docker-compose overrides them with volumes
+# locally, so including them costs nothing there.
+data/uploads/
 
 # Misc
 *.ipynb
-README.md
+*.log
+.ipynb_checkpoints
