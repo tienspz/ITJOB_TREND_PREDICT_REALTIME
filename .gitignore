@@ -34,3 +34,10 @@ data/*.bak
 
 # Generated JSON reports (created at runtime by /api/generate_report)
 reports/figures/report_*.json
+
+# Pytest
+.pytest_cache/
+
+# Runtime artifacts (tao lai khi chay)
+data/uploads/
+data/pending_links.csv
