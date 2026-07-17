@@ -1,0 +1,28 @@
+name: Keep Render backend awake
+
+# Render free tier spins down after 15 minutes of no traffic and takes ~50s
+# to wake — longer than Netlify's 26s proxy timeout, so a sleeping backend
+# looks like a broken dashboard to the first visitor.
+#
+# This workflow pings the health endpoint every 10 minutes between
+# 06:00–24:00 Vietnam time (UTC+7), keeping the service warm ~18h/day
+# (~558 instance-hours/month, safely under Render's 750h free budget).
+
+on:
+  schedule:
+    # 23:00-23:59 UTC = 06:00-06:59 VN
+    - cron: "*/10 23 * * *"
+    # 00:00-16:59 UTC = 07:00-23:59 VN
+    - cron: "*/10 0-16 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping backend health endpoint
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 90 \
+            https://itjob-trend-predict-realtime.onrender.com/api/health)
+          echo "Health check returned HTTP $code"
+          test "$code" = "200"

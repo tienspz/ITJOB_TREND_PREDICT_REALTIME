@@ -119,6 +119,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const FALLBACK_DOMAINS = ['Software Engineering', 'Data Science', 'DevOps/SRE', 'Cybersecurity', 'QA/Testing'];
     const FALLBACK_STATES = ['CA', 'TX', 'NY', 'WA', 'FL', 'Remote'];
 
+    // Free-tier backend can be asleep (~50s cold start, longer than the
+    // Netlify proxy timeout) — show a banner and retry instead of a blank page.
+    function showWakeBanner(attempt) {
+        let el = document.getElementById('wake-banner');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'wake-banner';
+            el.className = 'alert alert-info text-center mb-3';
+            el.style.cssText = 'background:rgba(0,210,255,0.1);border:1px solid rgba(0,210,255,0.35);color:#9be3f5;';
+            const container = document.querySelector('.main-container');
+            if (container) container.prepend(el);
+        }
+        el.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>' +
+            `Máy chủ miễn phí đang khởi động (~1 phút), dữ liệu sẽ tự hiện khi sẵn sàng... (lần thử ${attempt + 1}/6)`;
+    }
+
+    function hideWakeBanner() {
+        const el = document.getElementById('wake-banner');
+        if (el) el.remove();
+    }
+
     // Feature importance card (data computed at train time, served via /api/meta)
     const FEATURE_LABELS_VI = {
         years_experience: 'Số năm kinh nghiệm', seniority_level: 'Cấp bậc',
@@ -179,14 +200,22 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    async function initMeta() {
+    async function initMeta(attempt = 0) {
         const meta = await fetchMeta();
         if (!meta) {
+            if (attempt < 5) {
+                // Backend likely waking from free-tier sleep — retry in 15s
+                showWakeBanner(attempt);
+                setTimeout(() => initMeta(attempt + 1), 15000);
+                return;
+            }
+            hideWakeBanner();
             buildSkillBadges();
             populateSelect('hist-domain', FALLBACK_DOMAINS, FALLBACK_DOMAINS[0]);
             populateSelect('hist-state', FALLBACK_STATES, FALLBACK_STATES[0]);
             return;
         }
+        hideWakeBanner();
         window._meta = meta;
 
         const salaryMeta = meta.salary_meta || {};
