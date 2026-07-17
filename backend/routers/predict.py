@@ -70,6 +70,7 @@ DEFAULT_INPUTS = {
     "skill_programming": 1, "skill_cloud": 0, "skill_ai_ml": 0,
     "skill_database": 0, "skill_devops": 0, "skill_framework": 1,
     "skill_data_engineering": 0, "skill_security": 0, "skill_soft_skills": 1,
+    "years_experience": 3,
     "salary_annual": 100000.0,
     "seniority_level": "Mid", "job_type": "Remote",
     "state": "CA", "it_domain": "Software Engineering",
@@ -89,6 +90,7 @@ FEATURE_VALIDATION = {
     "skill_data_engineering": {"type": "int", "min": 0, "max": 10},
     "skill_security": {"type": "int", "min": 0, "max": 10},
     "skill_soft_skills": {"type": "int", "min": 0, "max": 10},
+    "years_experience": {"type": "int", "min": 0, "max": 40},
     "salary_annual": {"type": "float", "min": 0, "max": 1000000},
     "seniority_level": {"type": "category"},
     "job_type": {"type": "category"},
@@ -174,6 +176,7 @@ def predict_simple():
 
     features = dict(DEFAULT_INPUTS)
     features.update({
+        "years_experience": exp,
         "seniority_level": seniority,
         "skill_programming": 1,
         "skill_cloud": 1 if skill.lower() in ("aws", "azure", "gcp", "cloud") else 0,
@@ -304,6 +307,8 @@ def compare_skills():
     features = dict(DEFAULT_INPUTS)
     features.update({
         "num_skills": min(num_skills, 30),
+        "years_experience": _parse_int(data.get("years_experience"),
+                                       DEFAULT_INPUTS["years_experience"], 0, 40),
         "skill_diversity": len(categories_found),
         "skill_programming": skill_counts["prog"],
         "skill_cloud": skill_counts["cloud"],
@@ -369,8 +374,26 @@ def compare_skills():
 
 
 # ---------------------------------------------------------------------------
-# Historical trends
+# Historical trends — segment-anchored projection
+#
+# The Kaggle dataset is a single-week snapshot (first_seen 2024-01-12..17),
+# so per-month history per segment does not exist. Instead of synthesising
+# fake months, this endpoint anchors REAL segment statistics (median salary,
+# posting share of the chosen domain+state) onto the BLS-projected monthly
+# baseline (backup_trends.csv) and says so in the response.
 # ---------------------------------------------------------------------------
+_SEGMENT_CACHE = {"df": None}
+
+
+def _segment_data():
+    if _SEGMENT_CACHE["df"] is None and os.path.exists(config.PROCESSED_DATA_FILE):
+        _SEGMENT_CACHE["df"] = pd.read_csv(
+            config.PROCESSED_DATA_FILE,
+            usecols=["it_domain", "state", "salary_annual"],
+        )
+    return _SEGMENT_CACHE["df"]
+
+
 @bp.route("/api/historical_trends", methods=["POST"])
 def historical_trends():
     data = request.json
@@ -381,62 +404,63 @@ def historical_trends():
     state = str(data.get("state", "CA"))
     months = min(_parse_int(data.get("months"), 12, min_value=1), 36)
 
-    if not os.path.exists(config.PROCESSED_DATA_FILE):
+    df = _segment_data()
+    if df is None:
         return jsonify({"error": "Historical data not found"}), 503
 
     try:
-        df = pd.read_csv(config.PROCESSED_DATA_FILE)
-        if "month" not in df.columns:
-            date_cols = [c for c in df.columns if "date" in c.lower()]
-            if date_cols:
-                df["month"] = pd.to_datetime(df[date_cols[0]], errors="coerce").dt.to_period("M").astype(str)
-            else:
-                # Dataset carries no posting date: bucket rows into 30 synthetic
-                # months (2024-01 ...) by row order so trends stay plottable.
-                total_months = 30
-                start = pd.Timestamp("2024-01-01")
-                labels = [(start + pd.DateOffset(months=i)).strftime("%Y-%m") for i in range(total_months)]
-                block = max(len(df) // total_months, 1)
-                df["month"] = [labels[min(i // block, total_months - 1)] for i in range(len(df))]
-
-        domain_mask = df["it_domain"].astype(str).str.contains(domain, case=False, na=False, regex=False) \
-            if "it_domain" in df.columns else pd.Series(True, index=df.index)
-        state_mask = df["state"].astype(str).str.contains(state, case=False, na=False, regex=False) \
-            if "state" in df.columns else pd.Series(True, index=df.index)
-
-        filtered = df[domain_mask & state_mask].copy()
-        if len(filtered) < 10:
-            # Fallback: domain-only filter when the state slice is too thin
-            filtered = df[domain_mask].copy()
-        if len(filtered) < 10:
+        # REAL segment statistics from the Kaggle snapshot
+        domain_mask = df["it_domain"].astype(str).str.contains(domain, case=False, na=False, regex=False)
+        state_mask = df["state"].astype(str).str.contains(state, case=False, na=False, regex=False)
+        segment = df[domain_mask & state_mask]
+        segment_scope = "domain+state"
+        if len(segment) < 10:
+            segment = df[domain_mask]
+            segment_scope = "domain"
+        if len(segment) < 10:
             return jsonify({"error": "Insufficient data for trend analysis"}), 400
 
-        grouped = filtered.groupby("month").agg(
-            avg_salary=("salary_annual", "median"),
-            job_count=("salary_annual", "count"),
-        ).reset_index().sort_values("month")
-        grouped = grouped.tail(months)
+        seg_salaries = segment["salary_annual"].dropna()
+        seg_median = float(seg_salaries.median()) if len(seg_salaries) else None
+        seg_share = len(segment) / max(len(df), 1)
+        if seg_median is None:
+            return jsonify({"error": "No salary data for this segment"}), 400
 
-        if len(grouped) >= 3:
-            X = np.arange(len(grouped)).reshape(-1, 1)
-            y_salary = grouped["avg_salary"].values
-            lr = LinearRegression()
-            lr.fit(X, y_salary)
-            growth_rate = float(lr.coef_[0])
-            growth_pct = (growth_rate / max(y_salary.mean(), 1)) * 100
-        else:
-            growth_rate = 0
-            growth_pct = 0
+        # BLS-projected monthly baseline
+        baseline = pd.read_csv(config.BACKUP_TRENDS_FILE).tail(months)
+        base_salary = baseline["avg_salary"].astype(float)
+        base_jobs = baseline["job_count"].astype(float)
+
+        # Anchor the segment's real median at the latest month, apply the
+        # baseline growth shape; demand = baseline volume x real segment share
+        salary_trend = (seg_median * base_salary / base_salary.iloc[-1]).round(2).tolist()
+        demand_trend = (base_jobs * seg_share).round().astype(int).tolist()
+
+        X = np.arange(len(salary_trend)).reshape(-1, 1)
+        lr = LinearRegression().fit(X, np.array(salary_trend))
+        growth_rate = float(lr.coef_[0])
+        growth_pct = (growth_rate / max(np.mean(salary_trend), 1)) * 100
 
         return jsonify({
-            "labels": grouped["month"].tolist(),
-            "salary_trend": [round(float(s), 2) for s in grouped["avg_salary"].tolist()],
-            "demand_trend": [int(c) for c in grouped["job_count"].tolist()],
+            "labels": baseline["month"].tolist(),
+            "salary_trend": salary_trend,
+            "demand_trend": demand_trend,
             "domain": domain,
             "state": state,
             "growth_rate": round(growth_rate, 2),
             "growth_percentage": round(growth_pct, 2),
-            "data_points": len(grouped),
+            "data_points": len(salary_trend),
+            "data_source": "segment_anchored_projection",
+            "note": ("Chuỗi thời gian là CHIẾU từ baseline BLS (~3.5%/năm), neo trên số liệu "
+                     "THẬT của phân khúc từ snapshot Kaggle 01/2024."),
+            "segment": {
+                "scope": segment_scope,
+                "job_count": int(len(segment)),
+                "share_pct": round(seg_share * 100, 2),
+                "median_salary": round(seg_median, 2),
+                "p25_salary": round(float(seg_salaries.quantile(0.25)), 2),
+                "p75_salary": round(float(seg_salaries.quantile(0.75)), 2),
+            },
         })
 
     except Exception as e:

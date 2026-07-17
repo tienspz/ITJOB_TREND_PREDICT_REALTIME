@@ -54,7 +54,16 @@ SKILL_KW = {
     "soft_skills": ["communication", "leadership", "teamwork", "agile", "scrum"],
 }
 
-SALARY_RE = re.compile(r'\$([0-9]{2,3})[kK]\b|\$([0-9]{2,3}),[0-9]{3}\b', re.IGNORECASE)
+# Salary range: "$68,000 - $77,000", "$19.40 - $30.22" (hourly), "$120K-$150K"
+SALARY_RANGE_RE = re.compile(
+    r'\$\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]+)?)\s*([kK])?\s*(?:-|–|to)\s*'
+    r'\$?\s*([0-9]{1,3}(?:,[0-9]{3})*(?:\.[0-9]+)?)\s*([kK])?', re.IGNORECASE)
+# Single value: "$120K" or "$120,000"
+SALARY_SINGLE_RE = re.compile(r'\$([0-9]{2,3})[kK]\b|\$([0-9]{2,3}),[0-9]{3}\b', re.IGNORECASE)
+
+# Years of experience: "5+ years of experience", "3 yrs relevant experience"
+YOE_RE = re.compile(
+    r'(\d{1,2})\s*\+?\s*(?:years?|yrs?)(?:\s+of)?\s+(?:\w+\s+){0,2}?experience', re.IGNORECASE)
 
 
 def ns(loc):
@@ -109,12 +118,59 @@ def count_skill(text, kws):
     return sum(1 for kw in kws if re.search(r'\b' + re.escape(kw.strip()) + r'\b', t))
 
 
+def _to_annual(value, has_k):
+    """Normalise a raw dollar figure to an annual salary.
+
+    < $200 without 'k'  -> hourly rate, annualise x2080h
+    $200..$20,000       -> ambiguous (weekly/monthly), drop
+    $20,000..$500,000   -> already annual
+    """
+    v = value * 1000 if has_k else value
+    if v < 200:
+        v = v * 2080  # hourly -> annual (40h x 52w)
+    if 20000 <= v <= 500000:
+        return v
+    return None
+
+
 def extract_salary(text):
-    if not text: return np.nan
-    m = SALARY_RE.findall(str(text))
+    """Extract (annual, min, max) salary from a job summary.
+
+    Prefers RANGE patterns ("$68,000 - $77,000", "$19.40-$30.22" hourly)
+    and returns the midpoint; falls back to single-value patterns.
+    """
+    if not text:
+        return np.nan, np.nan, np.nan
+    t = str(text)
+
+    for lo_s, lo_k, hi_s, hi_k in SALARY_RANGE_RE.findall(t):
+        try:
+            lo = _to_annual(float(lo_s.replace(",", "")), bool(lo_k))
+            hi = _to_annual(float(hi_s.replace(",", "")), bool(hi_k))
+        except ValueError:
+            continue
+        if lo is not None and hi is not None and lo <= hi and hi <= lo * 5:
+            return (lo + hi) / 2, lo, hi
+
+    # Both single-value groups are in thousands: "$120K" -> 120, "$68,000" -> 68
+    m = SALARY_SINGLE_RE.findall(t)
     if m:
-        vals = [float(a)*1000 if a else float(b)*1000 for a, b in m if a or b]
-        return np.mean(vals) if vals else np.nan
+        vals = [float(a or b) * 1000 for a, b in m if a or b]
+        vals = [v for v in vals if 20000 <= v <= 500000]
+        if vals:
+            return float(np.mean(vals)), np.nan, np.nan
+    return np.nan, np.nan, np.nan
+
+
+def extract_years_experience(text):
+    """Extract required years of experience ("5+ years of experience")."""
+    if not text:
+        return np.nan
+    m = YOE_RE.search(str(text))
+    if m:
+        yoe = int(m.group(1))
+        if 0 <= yoe <= 40:
+            return yoe
     return np.nan
 
 
@@ -182,7 +238,8 @@ def process():
         st = ns(loc)
         dom = md(title)
         jt = njt(jtype)
-        sal = extract_salary(sm)
+        sal, sal_min, sal_max = extract_salary(sm)
+        yoe = extract_years_experience(sm)
 
         feats = {f"skill_{c}": count_skill(combined, kws) for c, kws in SKILL_KW.items()}
         feats["num_skills"] = sum(feats.values())
@@ -191,7 +248,8 @@ def process():
         rows.append({
             "job_link": link, "job_title": title, "company": company,
             "state": st, "it_domain": dom, "seniority_level": sen, "job_type": jt,
-            "salary_annual": sal, **feats,
+            "salary_annual": sal, "salary_min": sal_min, "salary_max": sal_max,
+            "years_experience": yoe, **feats,
         })
 
         if len(rows) % 50_000 == 0:
@@ -213,7 +271,8 @@ def process():
 
     # Save
     cols = ["job_link", "job_title", "company", "state", "it_domain", "seniority_level", "job_type",
-            "salary_annual", "num_skills", "skill_diversity", "skill_programming", "skill_cloud",
+            "salary_annual", "salary_min", "salary_max", "years_experience",
+            "num_skills", "skill_diversity", "skill_programming", "skill_cloud",
             "skill_ai_ml", "skill_database", "skill_devops", "skill_framework", "skill_data_engineering",
             "skill_security", "skill_soft_skills"]
     df = df[[c for c in cols if c in df.columns]]
@@ -228,7 +287,10 @@ def process():
     print(f"  State (top10): {dict(df['state'].value_counts().head(10))}", flush=True)
     print(f"  Job type: {dict(df['job_type'].value_counts())}", flush=True)
     print(f"  Domain: {dict(df['it_domain'].value_counts())}", flush=True)
-    print(f"  Salaries: {df['salary_annual'].notna().sum()}", flush=True)
+    print(f"  Salaries: {df['salary_annual'].notna().sum()} "
+          f"(range-based: {df['salary_min'].notna().sum()})", flush=True)
+    print(f"  Years-of-experience extracted: {df['years_experience'].notna().sum()} "
+          f"(median: {df['years_experience'].median()})", flush=True)
     print("Done!", flush=True)
 
 

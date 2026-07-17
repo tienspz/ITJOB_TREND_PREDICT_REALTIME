@@ -30,6 +30,10 @@ except ImportError:
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
+# "5+ years of experience", "8 yrs software experience"
+YOE_RE = re.compile(
+    r'(\d{1,2})\s*\+?\s*(?:years?|yrs?)(?:\s+of)?\s+(?:\w+\s+){0,2}?experience', re.IGNORECASE)
+
 # Load metadata for categories
 try:
     meta = joblib.load(os.path.join(config.MODELS_DIR, "salary_model_meta.joblib"))
@@ -134,6 +138,17 @@ def parse_cv_and_predict(filepath, ext, model=None):
     elif any(x in text_lower for x in ["junior", "entry", "intern"]):
         seniority = "Junior"
         
+    # Years of experience: regex from CV text, else infer from seniority
+    years_experience = None
+    m = YOE_RE.search(text)
+    if m:
+        y = int(m.group(1))
+        if 0 <= y <= 40:
+            years_experience = y
+    if years_experience is None:
+        years_experience = {"Junior": 1, "Mid": 3, "Senior": 8, "Manager": 12}.get(seniority, 3)
+    features["years_experience"] = years_experience
+
     # We need defaults for the model since a CV doesn't have a specific job location/type
     known_seniority = meta.get("seniority_level", [])
     features["seniority_level"] = seniority if seniority in known_seniority else (known_seniority[0] if known_seniority else "Mid")
@@ -158,5 +173,6 @@ def parse_cv_and_predict(filepath, ext, model=None):
         "extracted_text_length": len(text),
         "skills_found": found_skills,
         "inferred_seniority": seniority,
+        "years_experience": years_experience,
         "predicted_salary": round(salary_pred, 2)
     }

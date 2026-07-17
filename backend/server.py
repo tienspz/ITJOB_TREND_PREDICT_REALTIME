@@ -95,95 +95,134 @@ def _register_legacy_routes(app):
     @app.route('/api/realtime-trends', methods=['GET'])
     def realtime_trends():
         """
-        Trend forecast using Kaggle-derived historical data + realtime API.
-        
-        Historical: Monthly IT job counts from Kaggle LinkedIn data (Jan 2024
-        as baseline) projected with ~3.5% YoY growth (US BLS IT employment).
-        Stored in backup_trends.csv (30 months).
-        
-        Realtime: Current IT job count from the live provider chain
-        (freehire.dev -> RemoteOK -> cache -> snapshot).
-        
-        Forecast: Polynomial regression (degree 2) over the combined series.
-        """
-        data_points = []
-        source_label = "kaggle+realtime"
-        backup_file = config.BACKUP_TRENDS_FILE
+        Trend forecast: BLS-projected baseline + realtime point, with a
+        rolling-origin backtest that picks the better of two models.
 
-        # Get current job count from the live realtime pipeline
+        Baseline: backup_trends.csv — 30 monthly IT job counts anchored on
+        the Kaggle Jan-2024 snapshot and projected with ~3.5% YoY growth
+        (US BLS IT employment). This is a PROJECTION, not measured history
+        (the Kaggle crawl spans a single week) — the response says so.
+
+        Realtime: current IT job count from the provider chain, scaled to
+        the baseline magnitude and attached as the current month.
+
+        Forecast: Polynomial(deg 2) vs Holt-Winters (statsmodels), compared
+        by MAPE on the last 6 held-out points; the winner refits on the full
+        series and forecasts 2 months with a ±1.96σ residual interval.
+        """
+        # Current job count from the live realtime pipeline
         try:
             from backend.services import trend_service
             report = trend_service.build_realtime_report()
             job_count = report.get("total_jobs", 0)
-            source_label = "kaggle+realtime"
         except Exception as e:
             app.logger.warning("Realtime pipeline unavailable for trend: %s", e)
             job_count = 0
 
-        df_trend = pd.read_csv(backup_file)
+        df_trend = pd.read_csv(config.BACKUP_TRENDS_FILE)
         data_points = df_trend.to_dict('records')
         current_month = pd.Timestamp.now().strftime("%Y-%m")
 
-        # Scale realtime API count to match Kaggle magnitude for meaningful chart
+        # Scale realtime API count to the baseline magnitude
         if job_count > 0:
             avg_hist = sum(d['job_count'] for d in data_points) / len(data_points)
-            scale_factor = max(avg_hist / max(job_count, 1), 0.1)
-            scaled_count = int(job_count * scale_factor)
+            scaled_count = int(job_count * max(avg_hist / max(job_count, 1), 0.1))
             if data_points and data_points[-1]["month"] == current_month:
                 data_points[-1]["job_count"] = scaled_count
             else:
                 data_points.append({"month": current_month, "job_count": scaled_count})
 
-        # Polynomial regression (degree 2) for curved trend forecast
-        X = np.array(range(len(data_points))).reshape(-1, 1)
-        y = np.array([d['job_count'] for d in data_points])
+        y = np.array([d['job_count'] for d in data_points], dtype=float)
+        n = len(y)
+        horizon = 2
 
-        if LinearRegression is not None and PolynomialFeatures is not None and len(data_points) >= 3:
+        def _poly_forecast(train, steps):
+            X = np.arange(len(train)).reshape(-1, 1)
             poly = PolynomialFeatures(degree=2)
-            X_poly = poly.fit_transform(X)
-            model = LinearRegression()
-            model.fit(X_poly, y)
-            next_indices = np.array([len(data_points), len(data_points) + 1]).reshape(-1, 1)
-            predictions = model.predict(poly.transform(next_indices))
-            coef = float(model.coef_[1]) if len(model.coef_) > 1 else 0.0
-        elif LinearRegression is not None and len(data_points) >= 2:
-            model = LinearRegression()
-            model.fit(X, y)
-            next_indices = np.array([len(data_points), len(data_points) + 1]).reshape(-1, 1)
-            predictions = model.predict(next_indices)
-            coef = float(model.coef_[0])
-        else:
-            predictions = [y[-1], y[-1]]
-            coef = 0.0
+            m = LinearRegression().fit(poly.fit_transform(X), train)
+            nxt = np.arange(len(train), len(train) + steps).reshape(-1, 1)
+            return m.predict(poly.transform(nxt)), (float(m.coef_[1]) if len(m.coef_) > 1 else 0.0)
 
-        last_point_label = data_points[-1]['month']
-        last_timestamp = pd.to_datetime(last_point_label, errors='coerce')
+        def _holt_forecast(train, steps):
+            from statsmodels.tsa.holtwinters import ExponentialSmoothing
+            m = ExponentialSmoothing(train, trend="add", seasonal=None,
+                                     initialization_method="estimated").fit()
+            return np.asarray(m.forecast(steps)), None
+
+        # Rolling-origin backtest on the last 6 points
+        backtest = {}
+        holdout = min(6, n - 4)
+        candidates = {"polynomial_deg2": _poly_forecast}
+        try:
+            import statsmodels  # noqa: F401
+            candidates["holt_winters"] = _holt_forecast
+        except ImportError:
+            app.logger.info("statsmodels not installed — forecasting with polynomial only.")
+
+        residuals_by_model = {}
+        if holdout >= 2:
+            train, test = y[:-holdout], y[-holdout:]
+            for name, fn in candidates.items():
+                try:
+                    pred, _ = fn(train, holdout)
+                    mape = float(np.mean(np.abs((test - pred) / np.maximum(test, 1))) * 100)
+                    backtest[name] = round(mape, 2)
+                    residuals_by_model[name] = test - pred
+                except Exception as e:
+                    app.logger.warning("backtest %s failed: %s", name, e)
+
+        model_used = min(backtest, key=backtest.get) if backtest else "polynomial_deg2"
+
+        # Final forecast: winner refit on the full series
+        try:
+            predictions, coef = candidates[model_used](y, horizon)
+        except Exception:
+            model_used = "polynomial_deg2"
+            predictions, coef = _poly_forecast(y, horizon)
+        if coef is None:  # Holt-Winters: derive trend sign from its forecast
+            coef = float(predictions[-1] - y[-1]) / max(horizon, 1)
+
+        # Simple ±1.96σ interval from backtest residuals
+        resid = residuals_by_model.get(model_used)
+        ci = float(1.96 * np.std(resid)) if resid is not None and len(resid) > 1 else 0.0
+
+        last_timestamp = pd.to_datetime(data_points[-1]['month'], errors='coerce')
         if last_timestamp is pd.NaT:
             last_timestamp = pd.Timestamp.now()
 
         forecast_points = []
         for pred in predictions:
-            if source_label == 'google_trends':
-                last_timestamp = last_timestamp + pd.Timedelta(days=1)
-                forecast_label = last_timestamp.strftime("%Y-%m-%d")
-            else:
-                last_timestamp = last_timestamp + pd.DateOffset(months=1)
-                forecast_label = last_timestamp.strftime("%Y-%m")
+            last_timestamp = last_timestamp + pd.DateOffset(months=1)
             forecast_points.append({
-                "month": forecast_label,
+                "month": last_timestamp.strftime("%Y-%m"),
                 "job_count": int(max(0, pred)),
+                "ci_low": int(max(0, pred - ci)),
+                "ci_high": int(max(0, pred + ci)),
                 "is_forecast": True,
             })
 
+        # Own accumulated realtime series (grows while the system runs)
+        try:
+            from backend.services import history_service
+            history_points = len(history_service.load_history())
+        except Exception:
+            history_points = 0
+
         return jsonify({
             "status": "success",
-            "source": source_label,
+            "source": "kaggle+realtime",
             "historical": data_points,
             "forecast": forecast_points,
             "metrics": {
                 "current_trend": "Tăng trưởng" if coef > 0 else "Suy giảm",
                 "growth_rate": round(coef, 2),
+                "model_used": model_used,
+                "backtest_mape": backtest,
+                "confidence_interval": round(ci, 1),
             },
+            "baseline_note": ("Chuỗi baseline là CHIẾU TĂNG TRƯỞNG từ snapshot Kaggle 01/2024 "
+                              "+ ~3.5%/năm (US BLS); điểm cuối là số realtime đã scale."),
+            "realtime_history_points": history_points,
         })
 
 

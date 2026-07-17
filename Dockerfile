@@ -16,5 +16,7 @@ COPY models/ ./models/
 COPY data/ ./data/
 COPY reports/ ./reports/
 COPY frontend/ ./frontend/
+# Needed by the docker-compose ml_worker service (weekly retrain + snapshots)
+COPY auto_worker.py retrain_all.py ./
 EXPOSE 5000
 CMD ["python", "-m", "backend.server"]

@@ -119,6 +119,66 @@ document.addEventListener('DOMContentLoaded', () => {
     const FALLBACK_DOMAINS = ['Software Engineering', 'Data Science', 'DevOps/SRE', 'Cybersecurity', 'QA/Testing'];
     const FALLBACK_STATES = ['CA', 'TX', 'NY', 'WA', 'FL', 'Remote'];
 
+    // Feature importance card (data computed at train time, served via /api/meta)
+    const FEATURE_LABELS_VI = {
+        years_experience: 'Số năm kinh nghiệm', seniority_level: 'Cấp bậc',
+        it_domain: 'Lĩnh vực IT', state: 'Bang', job_type: 'Hình thức làm việc',
+        num_skills: 'Số kỹ năng', skill_diversity: 'Độ đa dạng kỹ năng',
+        domain_seniority: 'Lĩnh vực × Cấp bậc', state_seniority: 'Bang × Cấp bậc',
+        skill_programming: 'KN Lập trình', skill_cloud: 'KN Cloud', skill_ai_ml: 'KN AI/ML',
+        skill_database: 'KN Database', skill_devops: 'KN DevOps', skill_framework: 'KN Framework',
+        skill_data_engineering: 'KN Data Engineering', skill_security: 'KN Bảo mật',
+        skill_soft_skills: 'KN Mềm',
+    };
+    let importanceChartInstance = null;
+    let importanceData = null;
+
+    function renderImportanceChart(importance) {
+        // Store + show card; defer drawing until the salary tab is visible
+        // (Chart.js sizes to 0 inside a hidden tab pane).
+        const card = document.getElementById('importance-card');
+        if (!card || !Array.isArray(importance) || !importance.length) return;
+        importanceData = importance;
+        card.classList.remove('d-none');
+        if (card.offsetParent !== null) drawImportanceChart();
+    }
+
+    function drawImportanceChart() {
+        const canvas = document.getElementById('importanceChart');
+        if (!canvas || !importanceData || importanceChartInstance) return;
+        importanceChartInstance = new Chart(canvas.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: importanceData.map(r => FEATURE_LABELS_VI[r.feature] || r.feature),
+                datasets: [{
+                    label: 'Mức giảm R² khi xáo trộn feature',
+                    data: importanceData.map(r => r.importance),
+                    backgroundColor: 'rgba(0,210,255,0.35)',
+                    borderColor: '#00d2ff',
+                    borderWidth: 1,
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#e0e0e0' } },
+                    y: { grid: { display: false }, ticks: { color: '#e0e0e0' } }
+                }
+            }
+        });
+    }
+
+    // Draw the importance chart the first time the salary tab becomes visible
+    const salaryTabBtn = document.getElementById('salary-tab');
+    if (salaryTabBtn) {
+        salaryTabBtn.addEventListener('shown.bs.tab', () => {
+            if (importanceChartInstance) importanceChartInstance.resize();
+            else drawImportanceChart();
+        });
+    }
+
     async function initMeta() {
         const meta = await fetchMeta();
         if (!meta) {
@@ -153,6 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         setModelMetaValues(meta);
         buildSkillBadges();
+        renderImportanceChart(salaryMeta.feature_importance);
     }
 
     // -----------------------------------------------------------------------
@@ -193,24 +254,33 @@ document.addEventListener('DOMContentLoaded', () => {
                     const labels = [];
                     const actualData = [];
                     const forecastData = [];
-                    
+                    const ciLow = [];
+                    const ciHigh = [];
+
                     // Process historical data
                     data.historical.forEach(item => {
                         labels.push(item.month);
                         actualData.push(item.job_count);
                         forecastData.push(null); // No forecast for historical
+                        ciLow.push(null);
+                        ciHigh.push(null);
                     });
-                    
+
                     // Connect the lines
                     if (actualData.length > 0) {
-                        forecastData[actualData.length - 1] = actualData[actualData.length - 1];
+                        const lastActual = actualData[actualData.length - 1];
+                        forecastData[actualData.length - 1] = lastActual;
+                        ciLow[actualData.length - 1] = lastActual;
+                        ciHigh[actualData.length - 1] = lastActual;
                     }
-                    
-                    // Process forecast data
+
+                    // Process forecast data (with confidence interval if provided)
                     data.forecast.forEach(item => {
                         labels.push(item.month);
                         actualData.push(null); // No actual data for future
                         forecastData.push(item.job_count);
+                        ciLow.push(item.ci_low != null ? item.ci_low : item.job_count);
+                        ciHigh.push(item.ci_high != null ? item.ci_high : item.job_count);
                     });
                     
                     // Render Chart
@@ -234,13 +304,28 @@ document.addEventListener('DOMContentLoaded', () => {
                                     tension: 0.3
                                 },
                                 {
-                                    label: 'Dự báo (Linear Regression)',
+                                    label: 'Dự báo (' + (data.metrics?.model_used === 'holt_winters' ? 'Holt-Winters' : 'Polynomial Regression') + ')',
                                     data: forecastData,
                                     borderColor: 'rgba(255, 206, 86, 1)',
                                     borderWidth: 2,
                                     borderDash: [5, 5],
                                     fill: false,
                                     tension: 0.3
+                                },
+                                {
+                                    label: 'Khoảng tin cậy 95%',
+                                    data: ciHigh,
+                                    borderColor: 'rgba(255,206,86,0.15)',
+                                    pointRadius: 0, borderWidth: 1,
+                                    fill: false, tension: 0.3
+                                },
+                                {
+                                    label: '_ci',
+                                    data: ciLow,
+                                    borderColor: 'rgba(255,206,86,0.15)',
+                                    backgroundColor: 'rgba(255,206,86,0.12)',
+                                    pointRadius: 0, borderWidth: 1,
+                                    fill: '-1', tension: 0.3
                                 }
                             ]
                         },
@@ -250,7 +335,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             plugins: {
                                 legend: {
                                     position: 'top',
-                                    labels: { color: '#e0e0e0' }
+                                    labels: { color: '#e0e0e0', filter: (item) => item.text !== '_ci' }
                                 },
                                 tooltip: {
                                     mode: 'index',
@@ -272,6 +357,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                     
                     canvas.style.display = 'block';
+
+                    // Baseline transparency note + backtest result
+                    const noteEl = document.getElementById('trend-note');
+                    if (noteEl) {
+                        let note = data.baseline_note || '';
+                        const bt = data.metrics?.backtest_mape;
+                        if (bt && Object.keys(bt).length) {
+                            const parts = Object.entries(bt).map(([m, v]) => `${m}: MAPE ${v}%`);
+                            note += ` — Backtest 6 điểm cuối: ${parts.join(' | ')}`;
+                        }
+                        noteEl.innerText = note;
+                    }
                 } else {
                     alert('Lỗi: ' + data.error);
                 }
@@ -330,6 +427,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 seniority_level: document.getElementById('pred-seniority').value,
                 job_type: document.getElementById('pred-job-type').value,
                 state: document.getElementById('pred-state').value,
+                years_experience: parseInt(document.getElementById('pred-experience')?.value) || 0,
                 num_skills: parseInt(document.getElementById('pred-num-skills').value) || 0,
                 
                 skill_programming: parseInt(document.getElementById('pred-prog').value) || 0,
@@ -464,6 +562,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (response.ok) {
                 // Populate results
                 document.getElementById('cv-seniority').innerText = data.inferred_seniority;
+                setText('cv-yoe', data.years_experience != null ? `${data.years_experience} năm` : '—');
                 
                 const badgesContainer = document.getElementById('cv-skills-badges');
                 badgesContainer.innerHTML = '';
@@ -954,6 +1053,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (resp.ok) {
                     document.getElementById('history-chart-container').classList.remove('d-none');
                     document.getElementById('history-growth').innerText = `Tốc độ tăng trưởng: ${data.growth_percentage > 0 ? '+' : ''}${data.growth_percentage.toFixed(1)}%/tháng`;
+                    if (data.segment) {
+                        setText('history-median', `Median thật: $${Number(data.segment.median_salary).toLocaleString()} (P25–P75: $${Number(data.segment.p25_salary).toLocaleString()}–$${Number(data.segment.p75_salary).toLocaleString()})`);
+                        setText('history-count', `${Number(data.segment.job_count).toLocaleString()} tin tuyển dụng (${data.segment.share_pct}% dataset)`);
+                    }
+                    setText('history-note', data.note || '');
                     if (historyChartInstance) historyChartInstance.destroy();
                     const ctx = document.getElementById('historyChart').getContext('2d');
                     historyChartInstance = new Chart(ctx, {

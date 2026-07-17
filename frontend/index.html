@@ -132,6 +132,7 @@
                                     <p class="mt-2 text-muted">Đang tải dữ liệu realtime...</p>
                                 </div>
                                 <canvas id="trendChart" style="max-height: 300px; display: none;"></canvas>
+                                <p class="small text-muted mt-2 mb-0" id="trend-note"></p>
                             </div>
                         </div>
                     </div>
@@ -164,6 +165,10 @@
                                         <div class="col-md-6">
                                             <label class="form-label">Vị trí (Bang)</label>
                                             <select class="form-select" id="pred-state"></select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label">Số năm kinh nghiệm</label>
+                                            <input type="number" class="form-control" id="pred-experience" min="0" max="40" value="3">
                                         </div>
                                         <div class="col-12 mt-4">
                                             <h6 class="mb-3 text-muted border-bottom border-secondary pb-2">Chọn bộ kỹ năng</h6>
@@ -209,6 +214,17 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Feature importance (populated from /api/meta) -->
+                        <div class="card glass-card mt-4 d-none" id="importance-card">
+                            <div class="card-body p-4">
+                                <h5 class="font-outfit fw-bold mb-1">Yếu Tố Ảnh Hưởng Lương Nhiều Nhất</h5>
+                                <p class="text-muted small mb-3">Permutation importance trên tập test cô lập — độ giảm R² khi xáo trộn từng feature</p>
+                                <div style="position:relative;height:300px;">
+                                    <canvas id="importanceChart"></canvas>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -231,7 +247,7 @@
                                 <div id="cv-result" class="d-none text-start mt-5 border-top border-secondary pt-4">
                                     <div class="row g-4">
                                         <div class="col-md-6">
-                                            <div class="card bg-dark border-secondary h-100"><div class="card-body"><h5 class="card-title text-info mb-3">Hồ sơ trích xuất</h5><p class="mb-1 text-muted small">Cấp bậc suy luận:</p><h4 class="mb-3" id="cv-seniority">—</h4><p class="mb-1 text-muted small">Kỹ năng tìm thấy:</p><div id="cv-skills-badges" class="d-flex flex-wrap gap-1"></div></div></div>
+                                            <div class="card bg-dark border-secondary h-100"><div class="card-body"><h5 class="card-title text-info mb-3">Hồ sơ trích xuất</h5><p class="mb-1 text-muted small">Cấp bậc suy luận:</p><h4 class="mb-2" id="cv-seniority">—</h4><p class="mb-1 text-muted small">Số năm kinh nghiệm:</p><h5 class="mb-3 text-warning" id="cv-yoe">—</h5><p class="mb-1 text-muted small">Kỹ năng tìm thấy:</p><div id="cv-skills-badges" class="d-flex flex-wrap gap-1"></div></div></div>
                                         </div>
                                         <div class="col-md-6">
                                             <div class="card bg-dark border-secondary h-100"><div class="card-body text-center d-flex flex-column justify-content-center"><h5 class="card-title text-success mb-3">Giá trị thị trường</h5><h1 class="display-4 fw-bold text-gradient mb-0" id="cv-salary">$0</h1><p class="text-muted mt-2">Lương Hàng Năm Dự Đoán</p><div class="mt-2"><span class="badge bg-info me-1" style="font-size:0.7rem" id="cv-r2">R² = -</span><span class="badge bg-warning text-dark" style="font-size:0.7rem" id="cv-mae">MAE = $0</span></div></div></div>
@@ -373,7 +389,10 @@
                                     </div>
                                     <div class="mt-3 text-center">
                                         <span class="badge bg-success" id="history-growth">Tốc độ tăng trưởng: —</span>
+                                        <span class="badge bg-info ms-1" id="history-median">Median: —</span>
+                                        <span class="badge bg-secondary ms-1" id="history-count">— tin tuyển dụng</span>
                                     </div>
+                                    <p class="small text-muted text-center mt-2 mb-0" id="history-note"></p>
                                 </div>
                             </div>
                         </div>

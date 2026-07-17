@@ -25,6 +25,7 @@ from datetime import datetime, timedelta
 
 from backend import config
 from backend.services import freehire_service, remoteok_service, google_jobs_service, realtime_cache
+from backend.services import history_service
 
 logger = logging.getLogger(__name__)
 
@@ -254,6 +255,13 @@ def build_realtime_report():
             "note": _source_note(source),
         },
     }
+
+    # Accumulate the project's own longitudinal series (1 row/hour max).
+    try:
+        history_service.record_snapshot(report)
+    except Exception as e:  # never let history-keeping break the dashboard
+        logger.warning("history snapshot failed: %s", e)
+
     return report
 
 

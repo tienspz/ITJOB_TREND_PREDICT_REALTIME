@@ -5,10 +5,12 @@ from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_sc
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.impute import SimpleImputer
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.metrics import r2_score, mean_absolute_error, silhouette_score
+from sklearn.inspection import permutation_importance
 
 warnings.filterwarnings('ignore')
 
@@ -32,14 +34,19 @@ df['state_seniority'] = df['state'].astype(str) + '_' + df['seniority_level'].as
 
 features = ['num_skills', 'skill_diversity', 'skill_programming', 'skill_cloud', 'skill_ai_ml',
             'skill_database', 'skill_devops', 'skill_framework', 'skill_data_engineering',
-            'skill_security', 'skill_soft_skills', 'seniority_level', 'job_type', 'state', 'it_domain',
+            'skill_security', 'skill_soft_skills', 'years_experience',
+            'seniority_level', 'job_type', 'state', 'it_domain',
             'domain_seniority', 'state_seniority']
 
-numeric_features = [f for f in features if f.startswith('skill_') or f == 'num_skills']
+numeric_features = [f for f in features if f.startswith('skill_') or f in ('num_skills', 'years_experience')]
 categorical_features = ['seniority_level', 'job_type', 'state', 'it_domain', 'domain_seniority', 'state_seniority']
 
+# years_experience is only extractable from ~45% of postings -> median-impute
 preprocessor = ColumnTransformer([
-    ('num', StandardScaler(), numeric_features),
+    ('num', Pipeline([
+        ('imputer', SimpleImputer(strategy='median')),
+        ('scaler', StandardScaler()),
+    ]), numeric_features),
     ('cat', OneHotEncoder(handle_unknown='ignore', sparse_output=False), categorical_features)
 ])
 
@@ -113,6 +120,38 @@ r2_test = r2_score(y_test, y_pred)
 mae_test = mean_absolute_error(y_test, y_pred)
 print(f"  FINAL (isolated test 20%): R²={r2_test:.4f}, MAE=${mae_test:,.0f}")
 
+# Permutation importance on the test set (explains the final model without
+# touching training decisions — computed after model selection is locked)
+print("  Computing permutation importance (test set)...")
+perm = permutation_importance(best_model, X_test, y_test, n_repeats=5,
+                              random_state=42, scoring='r2', n_jobs=-1)
+importance = sorted(
+    ({'feature': f, 'importance': round(float(m), 5)}
+     for f, m in zip(features, perm.importances_mean)),
+    key=lambda r: r['importance'], reverse=True)
+for row in importance[:5]:
+    print(f"    {row['feature']:<22} {row['importance']:.4f}")
+
+try:
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    plt.style.use('dark_background')
+    top = importance[:12][::-1]
+    plt.figure(figsize=(9, 6))
+    plt.barh([r['feature'] for r in top], [r['importance'] for r in top],
+             color='#00d2ff', alpha=0.7)
+    plt.xlabel('Permutation importance (drop in R², test set)')
+    plt.title('Salary Model — Feature Importance')
+    plt.tight_layout()
+    fig_dir = os.path.join(BASE_DIR, 'reports', 'figures')
+    os.makedirs(fig_dir, exist_ok=True)
+    plt.savefig(os.path.join(fig_dir, 'feature_importance.png'), dpi=150, bbox_inches='tight')
+    plt.close()
+    print("  Saved feature_importance.png")
+except Exception as e:
+    print(f"  (figure skipped: {e})")
+
 joblib.dump(best_model, os.path.join(MODELS_DIR, 'best_salary_model.joblib'), compress=3)
 
 meta_sal = {
@@ -129,6 +168,13 @@ meta_sal = {
     'train_size': len(X_train),
     'test_size': len(X_test),
     'model_type': best_model_name,
+    'feature_importance': importance[:12],
+    'salary_coverage': {
+        'rows_total': int(len(df)),
+        'rows_with_salary': int(df['salary_annual'].notna().sum()),
+        'rows_range_based': int(df['salary_min'].notna().sum()) if 'salary_min' in df.columns else 0,
+        'rows_with_yoe': int(df['years_experience'].notna().sum()) if 'years_experience' in df.columns else 0,
+    },
     'it_domain': sorted(df['it_domain'].dropna().unique().tolist()),
     'seniority_level': sorted(df['seniority_level'].dropna().unique().tolist()),
     'job_type': sorted(df['job_type'].dropna().unique().tolist()),
