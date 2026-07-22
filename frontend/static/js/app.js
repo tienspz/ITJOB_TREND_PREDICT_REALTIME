@@ -589,16 +589,20 @@ document.addEventListener('DOMContentLoaded', () => {
             });
             
             clearTimeout(timeoutId);
-            const data = await response.json();
+            const contentType = response.headers.get('content-type') || '';
+            let data = {};
+            if (contentType.includes('application/json')) {
+                try { data = await response.json(); } catch (e) { data = {}; }
+            }
             
-            if (response.ok) {
+            if (response.ok && data && !data.error) {
                 displayCVResult(data, loadingDiv, resultDiv, area);
-            } else if (isImageFile && data.error && data.error.includes('extract text')) {
-                // Server OCR failed — try client-side Tesseract.js fallback
-                console.warn('Server OCR failed, attempting client-side Tesseract.js fallback...');
+            } else if (isImageFile) {
+                // Server OCR failed or returned non-JSON error (e.g. 502/503 HTML) — use client OCR + local parser fallback
+                console.warn('Server upload returned error/non-JSON, attempting client-side Tesseract.js fallback...');
                 await clientSideOCRFallback(file, loadingDiv, resultDiv, area);
             } else {
-                alert('Lỗi: ' + (data.error || 'Đã có lỗi xảy ra'));
+                alert('Lỗi: ' + (data.error || 'Máy chủ phản hồi không hợp lệ. Vui lòng thử lại.'));
                 loadingDiv.classList.add('d-none');
                 area.classList.remove('d-none');
             }
@@ -685,6 +689,60 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
+     * Local in-browser CV text parser.
+     * Used when the backend server is sleeping, starting up, or returning HTML error pages.
+     */
+    function parseCVTextLocally(text) {
+        const textLower = text.toLowerCase();
+        const skillCategories = {
+            "programming": ["python", "java", "javascript", "typescript", "c++", "c#", "ruby", "golang", "go", "rust", "sql", "html", "css", "php"],
+            "cloud": ["aws", "azure", "gcp", "google cloud", "terraform", "kubernetes"],
+            "ai_ml": ["machine learning", "deep learning", "artificial intelligence", "nlp", "computer vision", "tensorflow", "pytorch", "keras", "scikit", "xgboost"],
+            "database": ["sql", "mysql", "postgresql", "oracle", "mongodb", "redis", "elasticsearch"],
+            "devops": ["docker", "kubernetes", "jenkins", "ci/cd", "github actions", "gitlab", "ansible", "terraform"],
+            "framework": ["react", "angular", "vue", "next.js", "node.js", "express", "django", "flask", "fastapi", "spring", "bootstrap", "tailwind"],
+            "data_engineering": ["apache spark", "hadoop", "kafka", "airflow", "etl", "dbt"],
+            "security": ["cybersecurity", "penetration testing", "vulnerability", "encryption", "firewall"],
+            "soft_skills": ["communication", "leadership", "teamwork", "problem solving", "agile", "scrum"]
+        };
+
+        const foundSkills = [];
+        for (const [cat, kws] of Object.entries(skillCategories)) {
+            for (const kw of kws) {
+                const regex = new RegExp('\\b' + kw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+                if (regex.test(textLower)) {
+                    foundSkills.push(kw.length <= 3 ? kw.toUpperCase() : kw.charAt(0).toUpperCase() + kw.slice(1));
+                }
+            }
+        }
+
+        let seniority = "Mid";
+        if (/\b(senior|lead|principal|head)\b/i.test(textLower)) seniority = "Senior";
+        else if (/\b(manager|director)\b/i.test(textLower)) seniority = "Manager";
+        else if (/\b(junior|entry|intern|fresher)\b/i.test(textLower)) seniority = "Junior";
+
+        let yoe = null;
+        const yoeMatch = text.match(/(\d{1,2})\s*\+?\s*(?:years?|yrs?)(?:\s+of)?\s+(?:\w+\s+){0,2}?experience/i);
+        if (yoeMatch) {
+            const y = parseInt(yoeMatch[1], 10);
+            if (y >= 0 && y <= 40) yoe = y;
+        }
+        if (yoe === null) {
+            yoe = { "Junior": 1, "Mid": 3, "Senior": 8, "Manager": 12 }[seniority] || 3;
+        }
+
+        const baseSalary = { "Junior": 55000, "Mid": 85000, "Senior": 125000, "Manager": 150000 }[seniority] || 85000;
+        const predictedSalary = baseSalary + (yoe * 3000) + (foundSkills.length * 1200);
+
+        return {
+            skills_found: [...new Set(foundSkills)],
+            inferred_seniority: seniority,
+            years_experience: yoe,
+            predicted_salary: Math.round(predictedSalary)
+        };
+    }
+
+    /**
      * Client-side OCR fallback using Tesseract.js.
      * Extracts text from the image in the browser, then sends it
      * to /api/parse_cv_text for skill extraction + salary prediction.
@@ -739,19 +797,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Send extracted text to backend for skill analysis & salary prediction
             if (loadingMsg) loadingMsg.textContent = 'Đang trích xuất kỹ năng & dự đoán lương...';
-            const resp = await fetch(`${API_BASE}/api/parse_cv_text`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ text: extractedText })
-            });
-            const data = await resp.json();
+            
+            try {
+                const resp = await fetch(`${API_BASE}/api/parse_cv_text`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: extractedText })
+                });
 
-            if (resp.ok) {
-                displayCVResult(data, loadingDiv, resultDiv, area);
-            } else {
-                alert('Lỗi phân tích CV: ' + (data.error || 'Thất bại'));
-                loadingDiv.classList.add('d-none');
-                area.classList.remove('d-none');
+                const contentType = resp.headers.get('content-type') || '';
+                if (resp.ok && contentType.includes('application/json')) {
+                    const data = await resp.json();
+                    displayCVResult(data, loadingDiv, resultDiv, area);
+                } else {
+                    // Backend returned HTML error (e.g. Render 502/503/404) or failed -> use local browser parser!
+                    console.warn('Backend server returned non-JSON/error response. Using local browser skill parser...');
+                    const localData = parseCVTextLocally(extractedText);
+                    displayCVResult(localData, loadingDiv, resultDiv, area);
+                }
+            } catch (fetchErr) {
+                console.warn('Backend server fetch failed. Using local browser skill parser:', fetchErr);
+                const localData = parseCVTextLocally(extractedText);
+                displayCVResult(localData, loadingDiv, resultDiv, area);
             }
         } catch (ocrErr) {
             console.error('Client-side OCR error detail:', ocrErr);
