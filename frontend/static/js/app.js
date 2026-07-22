@@ -628,28 +628,89 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     /**
+     * Preprocess CV photo/image on HTML5 Canvas:
+     * Resizes to optimal OCR resolution, converts to grayscale, and boosts contrast.
+     */
+    function preprocessImageForOCR(file) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            const url = URL.createObjectURL(file);
+            img.onload = () => {
+                URL.revokeObjectURL(url);
+                try {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    let width = img.width;
+                    let height = img.height;
+                    const targetWidth = 1600;
+                    if (width !== 0) {
+                        const scale = targetWidth / width;
+                        width = Math.round(width * scale);
+                        height = Math.round(height * scale);
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // Grayscale & contrast enhancement
+                    const imgData = ctx.getImageData(0, 0, width, height);
+                    const data = imgData.data;
+                    for (let i = 0; i < data.length; i += 4) {
+                        let gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+                        // Contrast boost
+                        gray = (gray - 128) * 1.3 + 128;
+                        gray = Math.min(255, Math.max(0, gray));
+                        data[i] = gray;
+                        data[i + 1] = gray;
+                        data[i + 2] = gray;
+                    }
+                    ctx.putImageData(imgData, 0, 0);
+                    
+                    canvas.toBlob((blob) => {
+                        resolve(blob || file);
+                    }, 'image/jpeg', 0.9);
+                } catch (e) {
+                    console.warn('Canvas preprocessing failed, using original file:', e);
+                    resolve(file);
+                }
+            };
+            img.onerror = () => {
+                URL.revokeObjectURL(url);
+                resolve(file);
+            };
+            img.src = url;
+        });
+    }
+
+    /**
      * Client-side OCR fallback using Tesseract.js.
      * Extracts text from the image in the browser, then sends it
      * to /api/parse_cv_text for skill extraction + salary prediction.
      */
     async function clientSideOCRFallback(file, loadingDiv, resultDiv, area) {
         const loadingMsg = loadingDiv.querySelector('h5');
-        if (loadingMsg) loadingMsg.textContent = 'Đang khởi chạy OCR trình duyệt...';
+        if (loadingMsg) loadingMsg.textContent = 'Đang tối ưu hóa hình ảnh CV...';
 
         try {
             if (typeof Tesseract === 'undefined') {
                 throw new Error('Thư viện Tesseract.js chưa được tải trên trình duyệt.');
             }
 
-            // Primary OCR with 'eng' (fastest & most reliable for IT CVs)
+            // Preprocess photo/image on canvas for max OCR accuracy
+            const imageToOCR = await preprocessImageForOCR(file);
+
+            if (loadingMsg) loadingMsg.textContent = 'Đang nhận diện chữ (OCR)...';
+
             let result;
             try {
-                result = await Tesseract.recognize(file, 'eng', {
+                result = await Tesseract.recognize(imageToOCR, 'eng', {
                     logger: m => {
                         if (loadingMsg) {
                             if (m.status === 'recognizing text') {
                                 const pct = Math.round((m.progress || 0) * 100);
-                                loadingMsg.textContent = `Đang OCR ảnh CV... ${pct}%`;
+                                loadingMsg.textContent = `Đang đọc chữ từ ảnh CV... ${pct}%`;
                             } else if (m.status) {
                                 loadingMsg.textContent = `Đang xử lý OCR (${m.status})...`;
                             }
@@ -657,27 +718,27 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
             } catch (engErr) {
-                console.warn('Tesseract eng failed, retrying with eng+vie:', engErr);
-                result = await Tesseract.recognize(file, 'eng+vie', {
+                console.warn('Tesseract eng failed on preprocessed image, trying original file:', engErr);
+                result = await Tesseract.recognize(file, 'eng', {
                     logger: m => {
                         if (loadingMsg && m.status === 'recognizing text') {
                             const pct = Math.round((m.progress || 0) * 100);
-                            loadingMsg.textContent = `Đang OCR ảnh CV... ${pct}%`;
+                            loadingMsg.textContent = `Đang đọc chữ từ ảnh CV... ${pct}%`;
                         }
                     }
                 });
             }
 
-            const extractedText = (result.data && result.data.text) ? result.data.text.trim() : '';
+            const extractedText = (result && result.data && result.data.text) ? result.data.text.trim() : '';
             if (!extractedText) {
-                alert('Không thể nhận diện chữ từ ảnh CV. Vui lòng chụp/tải ảnh rõ nét hơn hoặc dùng file PDF.');
+                alert('Không thể nhận diện được chữ từ ảnh CV. Vui lòng chụp/tải ảnh rõ nét hơn hoặc dùng file PDF.');
                 loadingDiv.classList.add('d-none');
                 area.classList.remove('d-none');
                 return;
             }
 
-            // Send extracted text to the backend for skill analysis & salary prediction
-            if (loadingMsg) loadingMsg.textContent = 'Đang phân tích kỹ năng & dự đoán lương...';
+            // Send extracted text to backend for skill analysis & salary prediction
+            if (loadingMsg) loadingMsg.textContent = 'Đang trích xuất kỹ năng & dự đoán lương...';
             const resp = await fetch(`${API_BASE}/api/parse_cv_text`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -693,8 +754,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 area.classList.remove('d-none');
             }
         } catch (ocrErr) {
-            console.error('Client-side OCR error:', ocrErr);
-            alert('Không thể đọc CV từ ảnh. Vui lòng kiểm tra lại kết nối mạng hoặc thử tệp PDF / ảnh rõ hơn.');
+            console.error('Client-side OCR error detail:', ocrErr);
+            const detailMsg = (ocrErr && ocrErr.message) ? ` (${ocrErr.message})` : '';
+            alert(`Không thể đọc CV từ ảnh${detailMsg}. Vui lòng thử lại với tệp PDF hoặc chụp ảnh rõ nét hơn.`);
             loadingDiv.classList.add('d-none');
             area.classList.remove('d-none');
         } finally {

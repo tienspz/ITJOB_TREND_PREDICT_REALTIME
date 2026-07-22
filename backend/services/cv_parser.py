@@ -36,12 +36,18 @@ try:
 except ImportError:
     Image = None
 
-try:
-    import easyocr
-    _easyocr_reader = easyocr.Reader(['en', 'vi'], gpu=False)
-except Exception:
-    easyocr = None
-    _easyocr_reader = None
+_easyocr_reader_cache = None
+
+def _get_easyocr_reader():
+    global _easyocr_reader_cache
+    if _easyocr_reader_cache is None:
+        try:
+            import easyocr
+            _easyocr_reader_cache = easyocr.Reader(['en'], gpu=False)
+        except Exception as e:
+            logger.warning(f"Could not initialize EasyOCR reader: {e}")
+            _easyocr_reader_cache = False
+    return _easyocr_reader_cache if _easyocr_reader_cache is not False else None
 
 try:
     import pytesseract
@@ -132,12 +138,13 @@ def _enhance_for_ocr(pil_img):
 # ---------------------------------------------------------------------------
 def _ocr_easyocr(pil_img):
     """Run EasyOCR on a PIL image and return extracted text."""
-    if _easyocr_reader is None or pil_img is None:
+    reader = _get_easyocr_reader()
+    if reader is None or pil_img is None:
         return ""
     try:
         import numpy as _np
         arr = _np.array(pil_img.convert("RGB") if pil_img.mode != "RGB" else pil_img)
-        results = _easyocr_reader.readtext(arr)
+        results = reader.readtext(arr)
         return " ".join(t for _, t, prob in results if prob > 0.15)
     except Exception as e:
         logger.error(f"EasyOCR failed: {e}")
