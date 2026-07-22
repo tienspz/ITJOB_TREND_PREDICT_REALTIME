@@ -633,36 +633,51 @@ document.addEventListener('DOMContentLoaded', () => {
      * to /api/parse_cv_text for skill extraction + salary prediction.
      */
     async function clientSideOCRFallback(file, loadingDiv, resultDiv, area) {
-        // Update loading message
         const loadingMsg = loadingDiv.querySelector('h5');
-        if (loadingMsg) loadingMsg.textContent = 'Đang OCR trực tiếp trên trình duyệt...';
+        if (loadingMsg) loadingMsg.textContent = 'Đang khởi chạy OCR trình duyệt...';
 
         try {
             if (typeof Tesseract === 'undefined') {
-                throw new Error('Tesseract.js chưa được tải.');
+                throw new Error('Thư viện Tesseract.js chưa được tải trên trình duyệt.');
             }
 
-            const imageUrl = URL.createObjectURL(file);
-            const result = await Tesseract.recognize(imageUrl, 'eng+vie', {
-                logger: m => {
-                    if (m.status === 'recognizing text' && loadingMsg) {
-                        const pct = Math.round((m.progress || 0) * 100);
-                        loadingMsg.textContent = `Đang OCR trên trình duyệt... ${pct}%`;
+            // Primary OCR with 'eng' (fastest & most reliable for IT CVs)
+            let result;
+            try {
+                result = await Tesseract.recognize(file, 'eng', {
+                    logger: m => {
+                        if (loadingMsg) {
+                            if (m.status === 'recognizing text') {
+                                const pct = Math.round((m.progress || 0) * 100);
+                                loadingMsg.textContent = `Đang OCR ảnh CV... ${pct}%`;
+                            } else if (m.status) {
+                                loadingMsg.textContent = `Đang xử lý OCR (${m.status})...`;
+                            }
+                        }
                     }
-                }
-            });
-            URL.revokeObjectURL(imageUrl);
+                });
+            } catch (engErr) {
+                console.warn('Tesseract eng failed, retrying with eng+vie:', engErr);
+                result = await Tesseract.recognize(file, 'eng+vie', {
+                    logger: m => {
+                        if (loadingMsg && m.status === 'recognizing text') {
+                            const pct = Math.round((m.progress || 0) * 100);
+                            loadingMsg.textContent = `Đang OCR ảnh CV... ${pct}%`;
+                        }
+                    }
+                });
+            }
 
             const extractedText = (result.data && result.data.text) ? result.data.text.trim() : '';
             if (!extractedText) {
-                alert('Không thể đọc được văn bản từ ảnh. Vui lòng thử lại với ảnh rõ hơn.');
+                alert('Không thể nhận diện chữ từ ảnh CV. Vui lòng chụp/tải ảnh rõ nét hơn hoặc dùng file PDF.');
                 loadingDiv.classList.add('d-none');
                 area.classList.remove('d-none');
                 return;
             }
 
-            // Send extracted text to the backend for skill analysis
-            if (loadingMsg) loadingMsg.textContent = 'Đang phân tích kỹ năng...';
+            // Send extracted text to the backend for skill analysis & salary prediction
+            if (loadingMsg) loadingMsg.textContent = 'Đang phân tích kỹ năng & dự đoán lương...';
             const resp = await fetch(`${API_BASE}/api/parse_cv_text`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -673,17 +688,16 @@ document.addEventListener('DOMContentLoaded', () => {
             if (resp.ok) {
                 displayCVResult(data, loadingDiv, resultDiv, area);
             } else {
-                alert('Lỗi: ' + (data.error || 'Phân tích thất bại'));
+                alert('Lỗi phân tích CV: ' + (data.error || 'Thất bại'));
                 loadingDiv.classList.add('d-none');
                 area.classList.remove('d-none');
             }
         } catch (ocrErr) {
-            console.error('Client-side OCR failed:', ocrErr);
-            alert('Không thể đọc CV từ ảnh. Vui lòng thử lại với file PDF hoặc ảnh rõ hơn.');
+            console.error('Client-side OCR error:', ocrErr);
+            alert('Không thể đọc CV từ ảnh. Vui lòng kiểm tra lại kết nối mạng hoặc thử tệp PDF / ảnh rõ hơn.');
             loadingDiv.classList.add('d-none');
             area.classList.remove('d-none');
         } finally {
-            // Restore loading message for next use
             if (loadingMsg) loadingMsg.textContent = 'Đang phân tích CV...';
         }
     }
