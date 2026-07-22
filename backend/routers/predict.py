@@ -15,7 +15,7 @@ from werkzeug.utils import secure_filename
 
 from backend import config
 from backend import model_registry
-from backend.services.cv_parser import parse_cv_and_predict
+from backend.services.cv_parser import parse_cv_and_predict, parse_cv_text_and_predict
 
 bp = Blueprint("predict", __name__)
 
@@ -606,6 +606,26 @@ def upload_cv():
         from flask import current_app
         current_app.logger.error(f"CV parsing error: {e}")
         return jsonify({"error": "An error occurred during CV parsing. Please try another file."}), 500
+
+
+@bp.route("/api/parse_cv_text", methods=["POST"])
+def parse_cv_text():
+    """Accept pre-extracted text (e.g. from client-side Tesseract.js OCR)
+    and run the same skill-extraction + salary-prediction pipeline."""
+    data = request.json
+    if not data or not data.get("text", "").strip():
+        return jsonify({"error": "No text provided."}), 400
+
+    try:
+        salary_model = model_registry.get_salary_model()
+        result = parse_cv_text_and_predict(data["text"], model=salary_model)
+        if "error" in result:
+            return jsonify(result), 400
+        return jsonify(result)
+    except Exception as e:
+        from flask import current_app
+        current_app.logger.error(f"CV text parsing error: {e}")
+        return jsonify({"error": "An error occurred during CV text parsing."}), 500
 
 
 def _safe_remove(path):

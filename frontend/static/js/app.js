@@ -571,12 +571,15 @@ document.addEventListener('DOMContentLoaded', () => {
         area.classList.add('d-none');
         loadingDiv.classList.remove('d-none');
         resultDiv.classList.add('d-none');
+
+        // Helper: check if this is an image file (used to decide OCR fallback)
+        const isImageFile = /\.(png|jpe?g|gif|bmp|webp|tiff?)$/i.test(file.name);
         
         const formData = new FormData();
         formData.append('cv', file);
         
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+        const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout (OCR is slow)
         
         try {
             const response = await fetch(`${API_BASE}/api/upload_cv`, {
@@ -589,37 +592,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const data = await response.json();
             
             if (response.ok) {
-                // Populate results
-                document.getElementById('cv-seniority').innerText = data.inferred_seniority;
-                setText('cv-yoe', data.years_experience != null ? `${data.years_experience} năm` : '—');
-                
-                const badgesContainer = document.getElementById('cv-skills-badges');
-                badgesContainer.innerHTML = '';
-                
-                if (data.skills_found.length > 0) {
-                    // unique skills only
-                    const uniqueSkills = [...new Set(data.skills_found)];
-                    uniqueSkills.forEach(skill => {
-                        const span = document.createElement('span');
-                        span.className = 'skill-badge';
-                        span.innerText = skill;
-                        badgesContainer.appendChild(span);
-                    });
-                } else {
-                    badgesContainer.innerHTML = '<span class="text-muted small">Không phát hiện kỹ năng IT cụ thể.</span>';
-                }
-                
-                const formattedSalary = new Intl.NumberFormat('en-US', {
-                    style: 'currency',
-                    currency: 'USD',
-                    maximumFractionDigits: 0
-                }).format(data.predicted_salary);
-                
-                document.getElementById('cv-salary').innerText = formattedSalary;
-                
-                loadingDiv.classList.add('d-none');
-                resultDiv.classList.remove('d-none');
-                resultDiv.classList.add('animate-fade-in');
+                displayCVResult(data, loadingDiv, resultDiv, area);
+            } else if (isImageFile && data.error && data.error.includes('extract text')) {
+                // Server OCR failed — try client-side Tesseract.js fallback
+                console.warn('Server OCR failed, attempting client-side Tesseract.js fallback...');
+                await clientSideOCRFallback(file, loadingDiv, resultDiv, area);
             } else {
                 alert('Lỗi: ' + (data.error || 'Đã có lỗi xảy ra'));
                 loadingDiv.classList.add('d-none');
@@ -628,14 +605,122 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) {
             clearTimeout(timeoutId);
             console.error(err);
-            if (err.name === 'AbortError') {
-                alert('Hết thời gian xử lý (Timeout). Vui lòng thử lại.');
+            if (isImageFile && err.name !== 'AbortError') {
+                // Network or server error on image — try client-side OCR
+                console.warn('Server unreachable for OCR, attempting client-side Tesseract.js...');
+                await clientSideOCRFallback(file, loadingDiv, resultDiv, area);
+            } else if (err.name === 'AbortError') {
+                // Timeout — also try client-side OCR for images
+                if (isImageFile) {
+                    console.warn('Server OCR timed out, attempting client-side Tesseract.js...');
+                    await clientSideOCRFallback(file, loadingDiv, resultDiv, area);
+                } else {
+                    alert('Hết thời gian xử lý (Timeout). Vui lòng thử lại.');
+                    loadingDiv.classList.add('d-none');
+                    area.classList.remove('d-none');
+                }
             } else {
                 alert('Không thể xử lý CV.');
+                loadingDiv.classList.add('d-none');
+                area.classList.remove('d-none');
             }
+        }
+    }
+
+    /**
+     * Client-side OCR fallback using Tesseract.js.
+     * Extracts text from the image in the browser, then sends it
+     * to /api/parse_cv_text for skill extraction + salary prediction.
+     */
+    async function clientSideOCRFallback(file, loadingDiv, resultDiv, area) {
+        // Update loading message
+        const loadingMsg = loadingDiv.querySelector('h5');
+        if (loadingMsg) loadingMsg.textContent = 'Đang OCR trực tiếp trên trình duyệt...';
+
+        try {
+            if (typeof Tesseract === 'undefined') {
+                throw new Error('Tesseract.js chưa được tải.');
+            }
+
+            const imageUrl = URL.createObjectURL(file);
+            const result = await Tesseract.recognize(imageUrl, 'eng+vie', {
+                logger: m => {
+                    if (m.status === 'recognizing text' && loadingMsg) {
+                        const pct = Math.round((m.progress || 0) * 100);
+                        loadingMsg.textContent = `Đang OCR trên trình duyệt... ${pct}%`;
+                    }
+                }
+            });
+            URL.revokeObjectURL(imageUrl);
+
+            const extractedText = (result.data && result.data.text) ? result.data.text.trim() : '';
+            if (!extractedText) {
+                alert('Không thể đọc được văn bản từ ảnh. Vui lòng thử lại với ảnh rõ hơn.');
+                loadingDiv.classList.add('d-none');
+                area.classList.remove('d-none');
+                return;
+            }
+
+            // Send extracted text to the backend for skill analysis
+            if (loadingMsg) loadingMsg.textContent = 'Đang phân tích kỹ năng...';
+            const resp = await fetch(`${API_BASE}/api/parse_cv_text`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: extractedText })
+            });
+            const data = await resp.json();
+
+            if (resp.ok) {
+                displayCVResult(data, loadingDiv, resultDiv, area);
+            } else {
+                alert('Lỗi: ' + (data.error || 'Phân tích thất bại'));
+                loadingDiv.classList.add('d-none');
+                area.classList.remove('d-none');
+            }
+        } catch (ocrErr) {
+            console.error('Client-side OCR failed:', ocrErr);
+            alert('Không thể đọc CV từ ảnh. Vui lòng thử lại với file PDF hoặc ảnh rõ hơn.');
             loadingDiv.classList.add('d-none');
             area.classList.remove('d-none');
+        } finally {
+            // Restore loading message for next use
+            if (loadingMsg) loadingMsg.textContent = 'Đang phân tích CV...';
         }
+    }
+
+    /**
+     * Display CV analysis results in the UI.
+     */
+    function displayCVResult(data, loadingDiv, resultDiv, area) {
+        document.getElementById('cv-seniority').innerText = data.inferred_seniority;
+        setText('cv-yoe', data.years_experience != null ? `${data.years_experience} năm` : '—');
+        
+        const badgesContainer = document.getElementById('cv-skills-badges');
+        badgesContainer.innerHTML = '';
+        
+        if (data.skills_found && data.skills_found.length > 0) {
+            const uniqueSkills = [...new Set(data.skills_found)];
+            uniqueSkills.forEach(skill => {
+                const span = document.createElement('span');
+                span.className = 'skill-badge';
+                span.innerText = skill;
+                badgesContainer.appendChild(span);
+            });
+        } else {
+            badgesContainer.innerHTML = '<span class="text-muted small">Không phát hiện kỹ năng IT cụ thể.</span>';
+        }
+        
+        const formattedSalary = new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD',
+            maximumFractionDigits: 0
+        }).format(data.predicted_salary);
+        
+        document.getElementById('cv-salary').innerText = formattedSalary;
+        
+        loadingDiv.classList.add('d-none');
+        resultDiv.classList.remove('d-none');
+        resultDiv.classList.add('animate-fade-in');
     }
     
     window.resetCVUpload = function() {
